@@ -1,0 +1,20 @@
+{
+  "name": "sls_admin",
+  "version": "1.0.0",
+  "description": "A Flutter Web administration portal for **Swiss Luxury Services (SLS)** — private jet charter and VIP concierge services.",
+  "main": "index.js",
+  "directories": {
+    "lib": "lib",
+    "test": "test"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "firebase-admin": "^14.4.0"
+  }
+}

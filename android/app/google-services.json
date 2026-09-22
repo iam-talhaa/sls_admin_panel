@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "980918373051",
+    "project_id": "swissproject-33b18",
+    "storage_bucket": "swissproject-33b18.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:980918373051:android:d8034f81b7a5031a33f79e",
+        "android_client_info": {
+          "package_name": "com.example.sls_admin"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCMpxRv0_YtiPdJmMV8qbaFtGq3H0Zzzao"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:980918373051:android:8b84559893425f1633f79e",
+        "android_client_info": {
+          "package_name": "com.example.swiss_luxury_service"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCMpxRv0_YtiPdJmMV8qbaFtGq3H0Zzzao"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
