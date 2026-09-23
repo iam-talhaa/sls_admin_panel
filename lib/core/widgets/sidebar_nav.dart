@@ -76,6 +76,11 @@ class SidebarNav extends StatelessWidget {
       icon: Icons.view_quilt_outlined,
     ),
     NavItem(
+      title: 'Concierge',
+      route: '/concierge',
+      icon: Icons.hotel_class_outlined,
+    ),
+    NavItem(
       title: 'Admins',
       route: '/admins',
       icon: Icons.admin_panel_settings_outlined,

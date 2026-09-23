@@ -5,6 +5,8 @@ import '../../features/admins/views/admins_view.dart';
 import '../../features/auth/views/login_view.dart';
 import '../../features/blog/views/blog_form_view.dart';
 import '../../features/blog/views/blog_list_view.dart';
+import '../../features/concierge/views/concierge_category_form_view.dart';
+import '../../features/concierge/views/concierge_view.dart';
 import '../../features/concierge_requests/views/concierge_request_detail_view.dart';
 import '../../features/concierge_requests/views/concierge_requests_list_view.dart';
 import '../../features/dashboard/views/dashboard_view.dart';
@@ -167,6 +169,24 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/home-content',
             pageBuilder: (context, state) => const NoTransitionPage(child: HomeContentView()),
+          ),
+          // Concierge Services
+          GoRoute(
+            path: '/concierge',
+            pageBuilder: (context, state) => const NoTransitionPage(child: ConciergeView()),
+            routes: [
+              GoRoute(
+                path: 'new',
+                pageBuilder: (context, state) => const NoTransitionPage(child: ConciergeCategoryFormView(categoryId: 'new')),
+              ),
+              GoRoute(
+                path: ':id',
+                pageBuilder: (context, state) {
+                  final id = state.pathParameters['id'] ?? '';
+                  return NoTransitionPage(child: ConciergeCategoryFormView(categoryId: id));
+                },
+              ),
+            ],
           ),
           // Admins
           GoRoute(

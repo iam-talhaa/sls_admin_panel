@@ -1,6 +1,7 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import 'core/providers/theme_mode_provider.dart';
 import 'core/routes/app_router.dart';
 import 'core/theme/app_theme.dart';
@@ -10,15 +11,9 @@ import 'screens/auth_gate.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
-  runApp(
-    const ProviderScope(
-      child: SlsAdminApp(),
-    ),
-  );
+  runApp(const ProviderScope(child: SlsAdminApp()));
 }
 
 class SlsAdminApp extends ConsumerWidget {
@@ -28,7 +23,7 @@ class SlsAdminApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(appRouterProvider);
     final themeMode = ref.watch(themeModeProvider);
-
+    print("object");
     return MaterialApp.router(
       title: 'Swiss Luxury Services | Admin Portal',
       debugShowCheckedModeBanner: false,
@@ -36,9 +31,8 @@ class SlsAdminApp extends ConsumerWidget {
       darkTheme: AppTheme.darkTheme,
       themeMode: themeMode,
       routerConfig: router,
-      builder: (context, child) => AuthGate(
-        homeBuilder: () => child ?? const SizedBox.shrink(),
-      ),
+      builder: (context, child) =>
+          AuthGate(homeBuilder: () => child ?? const SizedBox.shrink()),
     );
   }
 }
