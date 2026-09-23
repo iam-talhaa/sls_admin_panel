@@ -23,7 +23,7 @@ class SlsAdminApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(appRouterProvider);
     final themeMode = ref.watch(themeModeProvider);
-    print("object");
+
     return MaterialApp.router(
       title: 'Swiss Luxury Services | Admin Portal',
       debugShowCheckedModeBanner: false,
