@@ -114,15 +114,79 @@ class _FleetListViewState extends ConsumerState<FleetListView> {
                 Text('Manage private jets and helicopters in the charter fleet.', style: AppTextStyles.subtitle.copyWith(color: colors.textSecondary)),
               ],
             ),
-            ElevatedButton.icon(
-              onPressed: () => context.go('/fleet/new'),
-              icon: const Icon(Icons.add, size: 18),
-              label: const Text('Add Aircraft'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: colors.primaryRed,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-              ),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Tooltip(
+                  message: 'Force-sync default fleet data to Firebase',
+                  child: OutlinedButton.icon(
+                    onPressed: () async {
+                      final colors = context.colors;
+                      final messenger = ScaffoldMessenger.of(context);
+
+                      // useRootNavigator: true fixes "No Overlay widget found"
+                      // crash on Flutter Web when using go_router.
+                      final confirmed = await showDialog<bool>(
+                        context: context,
+                        useRootNavigator: true,
+                        builder: (ctx) => AlertDialog(
+                          title: const Text('Sync Fleet to Firebase'),
+                          content: const Text(
+                            'This will overwrite the 4 default aircraft records in Firestore with the latest data (Light Jet, Midsize Jet, Heavy Jet, Helicopter).\n\nProceed?',
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.of(ctx).pop(false),
+                              child: const Text('Cancel'),
+                            ),
+                            TextButton(
+                              onPressed: () => Navigator.of(ctx).pop(true),
+                              child: const Text('Sync Now'),
+                            ),
+                          ],
+                        ),
+                      );
+
+                      if ((confirmed ?? false) && mounted) {
+                        try {
+                          await ref.read(fleetRepositoryProvider).seedInitialJets(force: true);
+                          messenger.showSnackBar(
+                            SnackBar(
+                              content: const Text('✅ Fleet data synced to Firebase successfully!'),
+                              backgroundColor: colors.success,
+                            ),
+                          );
+                        } catch (e) {
+                          messenger.showSnackBar(
+                            SnackBar(
+                              content: Text('Sync error: $e'),
+                              backgroundColor: colors.error,
+                            ),
+                          );
+                        }
+                      }
+                    },
+                    icon: const Icon(Icons.cloud_sync_outlined, size: 18),
+                    label: const Text('Sync to Firebase'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: colors.textSecondary,
+                      side: BorderSide(color: colors.border),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                ElevatedButton.icon(
+                  onPressed: () => context.go('/fleet/new'),
+                  icon: const Icon(Icons.add, size: 18),
+                  label: const Text('Add Aircraft'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: colors.primaryRed,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                  ),
+                ),
+              ],
             ),
           ],
         ),

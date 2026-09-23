@@ -23,6 +23,11 @@ import '../../features/users/views/users_list_view.dart';
 import '../providers/current_admin_provider.dart';
 import '../widgets/admin_scaffold.dart';
 
+// Stable key for the shell navigator — provides a proper Overlay
+// to all pages inside ShellRoute, fixing "No Overlay widget found"
+// errors on TextField tap (Flutter Web + go_router known issue).
+final _shellNavigatorKey = GlobalKey<NavigatorState>();
+
 final appRouterProvider = Provider<GoRouter>((ref) {
   final currentAdminAsync = ref.watch(currentAdminProvider);
 
@@ -58,6 +63,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         pageBuilder: (context, state) => const NoTransitionPage(child: LoginView()),
       ),
       ShellRoute(
+        navigatorKey: _shellNavigatorKey,
         builder: (context, state, child) {
           return AdminScaffold(
             currentRoute: state.matchedLocation,

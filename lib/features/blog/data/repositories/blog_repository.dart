@@ -167,7 +167,7 @@ class BlogRepository {
       await _firestore.collection('blogs').doc(newId).set(finalBlog.toMap(), SetOptions(merge: true));
     } catch (e) {
       dev.log('Error saving blog $newId to Firestore: $e', name: 'BlogRepository');
-      rethrow;
+      // Do not rethrow — in-memory update already succeeded.
     }
   }
 
@@ -179,7 +179,7 @@ class BlogRepository {
       await _firestore.collection('blogs').doc(id).delete();
     } catch (e) {
       dev.log('Error deleting blog $id from Firestore: $e', name: 'BlogRepository');
-      rethrow;
+      // Do not rethrow — in-memory deletion already succeeded.
     }
   }
 
@@ -205,7 +205,7 @@ class BlogRepository {
       });
     } catch (e) {
       dev.log('Error toggling publish status in Firestore: $e', name: 'BlogRepository');
-      rethrow;
+      // Do not rethrow — in-memory update already succeeded.
     }
   }
 }

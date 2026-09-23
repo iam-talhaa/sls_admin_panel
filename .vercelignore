@@ -1,0 +1,17 @@
+node_modules
+.dart_tool
+.flutter-plugins*
+android
+ios
+windows
+linux
+macos
+functions
+test
+*.log
+.git
+.idea
+.vscode
+.env*
+build/app
+build/ios

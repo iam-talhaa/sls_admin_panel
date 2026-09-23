@@ -18,6 +18,7 @@ class DestinationsListView extends ConsumerStatefulWidget {
 
 class _DestinationsListViewState extends ConsumerState<DestinationsListView> {
   String _searchQuery = '';
+  bool _isSyncing = false;
 
   Future<void> _deleteDestination(DestinationAdminModel dest) async {
     final colors = context.colors;
@@ -113,15 +114,90 @@ class _DestinationsListViewState extends ConsumerState<DestinationsListView> {
                 Text('Manage VIP travel routes, alpine ski hubs, and global event destinations.', style: AppTextStyles.subtitle.copyWith(color: colors.textSecondary)),
               ],
             ),
-            ElevatedButton.icon(
-              onPressed: () => context.go('/destinations/new'),
-              icon: const Icon(Icons.add, size: 18),
-              label: const Text('Add Destination'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: colors.primaryRed,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-              ),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Tooltip(
+                  message: 'Force-sync all 10 default destinations to Firebase Firestore',
+                  child: OutlinedButton.icon(
+                    onPressed: _isSyncing
+                        ? null
+                        : () async {
+                            final colors = context.colors;
+                            final messenger = ScaffoldMessenger.of(context);
+
+                            final confirmed = await ConfirmDialog.show(
+                              context,
+                              title: 'Sync Destinations to Firebase',
+                              message:
+                                  'This will sync all 10 default destinations with complete multilingual content (English, German, Arabic) and placeholder images to Firestore.\n\nProceed?',
+                              confirmLabel: 'Sync Now',
+                              icon: Icons.cloud_sync_outlined,
+                            );
+
+                            if (confirmed && mounted) {
+                              setState(() => _isSyncing = true);
+                              try {
+                                await ref
+                                    .read(destinationsRepositoryProvider)
+                                    .seedInitialDestinations(force: true);
+                                if (mounted) {
+                                  messenger.showSnackBar(
+                                    SnackBar(
+                                      content: const Text(
+                                          '✅ All 10 destinations synced to Firebase successfully!'),
+                                      backgroundColor: colors.success,
+                                    ),
+                                  );
+                                }
+                              } catch (e) {
+                                if (mounted) {
+                                  messenger.showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                          'Sync error: $e\n(Make sure you are logged in and Firestore rules allow writes)'),
+                                      backgroundColor: colors.error,
+                                      duration: const Duration(seconds: 6),
+                                    ),
+                                  );
+                                }
+                              } finally {
+                                if (mounted) {
+                                  setState(() => _isSyncing = false);
+                                }
+                              }
+                            }
+                          },
+                    icon: _isSyncing
+                        ? const SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Icon(Icons.cloud_sync_outlined, size: 18),
+                    label: Text(_isSyncing ? 'Syncing...' : 'Sync to Firebase'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: colors.textSecondary,
+                      side: BorderSide(color: colors.border),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                ElevatedButton.icon(
+                  onPressed: () => context.go('/destinations/new'),
+                  icon: const Icon(Icons.add, size: 18),
+                  label: const Text('Add Destination'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: colors.primaryRed,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                  ),
+                ),
+              ],
             ),
           ],
         ),

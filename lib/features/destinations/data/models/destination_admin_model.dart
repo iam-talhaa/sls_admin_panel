@@ -92,7 +92,7 @@ class DestinationAdminModel {
   }
 
   Map<String, dynamic> toMap() {
-    return {
+    final map = <String, dynamic>{
       'id': id,
       'order': order,
       'title': title.toMap(),
@@ -103,16 +103,17 @@ class DestinationAdminModel {
       'jetType': jetType,
       'seating': seating.toMap(),
       'range': range.toMap(),
-      'route': route?.toMap(),
-      'startingPrice': startingPrice?.toMap(),
       'description': description.toMap(),
       'whyTravelWithUs': whyTravelWithUs.map((e) => e.toMap()).toList(),
       'contentBlocks': contentBlocks.map((e) => e.toMap()).toList(),
-      'heading': heading?.toMap(),
       'isActive': isActive,
       'createdAt': (createdAt ?? DateTime.now()).toIso8601String(),
       'updatedAt': DateTime.now().toIso8601String(),
     };
+    if (route != null) map['route'] = route!.toMap();
+    if (startingPrice != null) map['startingPrice'] = startingPrice!.toMap();
+    if (heading != null) map['heading'] = heading!.toMap();
+    return map;
   }
 
   DestinationAdminModel copyWith({

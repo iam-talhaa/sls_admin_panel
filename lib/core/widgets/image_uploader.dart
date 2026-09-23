@@ -1,10 +1,10 @@
+import 'dart:convert';
 import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../theme/app_color_scheme.dart';
 import '../constants/app_text_styles.dart';
-import '../services/storage_service.dart';
 
 class ImageUploader extends ConsumerStatefulWidget {
   final String label;
@@ -18,9 +18,9 @@ class ImageUploader extends ConsumerStatefulWidget {
 
   const ImageUploader({
     super.key,
-    this.label = 'Image',
+    this.label = 'Image (Optional)',
     this.initialImageUrl,
-    required this.storagePath,
+    this.storagePath = '',
     required this.onImageUploaded,
     this.isRequired = false,
     this.height,
@@ -52,6 +52,36 @@ class _ImageUploaderState extends ConsumerState<ImageUploader> {
     }
   }
 
+  String _getFallbackPlaceholder() {
+    final path = widget.storagePath.toLowerCase();
+    if (path.contains('fleet') || path.contains('jet')) {
+      return 'assets/jet1.png';
+    } else if (path.contains('blog')) {
+      return 'assets/blog3.png';
+    } else if (path.contains('dest')) {
+      return 'assets/des1.jpg';
+    } else if (path.contains('concierge')) {
+      return 'assets/hotelBooking.png';
+    } else if (path.contains('home')) {
+      return 'assets/des1.jpg';
+    }
+    return 'assets/slslogo.png';
+  }
+
+  List<String> _getPresetsForCategory() {
+    final path = widget.storagePath.toLowerCase();
+    if (path.contains('fleet') || path.contains('jet')) {
+      return const ['assets/jet1.png', 'assets/jet2.png', 'assets/jet3.png', 'assets/chopper.png'];
+    } else if (path.contains('blog')) {
+      return const ['assets/blog3.png', 'assets/blog4.png', 'assets/blog5.png', 'assets/blog6.png', 'assets/blog7.png', 'assets/blog8.png', 'assets/blog9.png', 'assets/blog10.png', 'assets/blog11.png'];
+    } else if (path.contains('dest')) {
+      return const ['assets/des1.jpg', 'assets/des2.png', 'assets/des3.png', 'assets/des4.png', 'assets/des5.png', 'assets/des6.png', 'assets/des7.png', 'assets/des8.png'];
+    } else if (path.contains('concierge')) {
+      return const ['assets/hotelBooking.png', 'assets/conciergeService.png', 'assets/concierge2.png', 'assets/concierge3.png', 'assets/concierge4.png', 'assets/concierge5.png'];
+    }
+    return const ['assets/jet1.png', 'assets/des1.jpg', 'assets/blog3.png', 'assets/hotelBooking.png', 'assets/slslogo.png'];
+  }
+
   Future<void> _pickAndUpload() async {
     setState(() {
       _errorMessage = null;
@@ -76,35 +106,85 @@ class _ImageUploaderState extends ConsumerState<ImageUploader> {
         return;
       }
 
+      // Show the user's picked image in live preview, and assign a safe asset placeholder for storage
+      final placeholder = _getFallbackPlaceholder();
+
       setState(() {
         _previewBytes = bytes;
-        _isUploading = true;
-      });
-
-      final extension = file.extension?.toLowerCase() ?? 'png';
-      final contentType = 'image/$extension';
-      final fileName = 'img_${DateTime.now().millisecondsSinceEpoch}.$extension';
-      final fullPath = '${widget.storagePath}/$fileName';
-
-      final storageService = ref.read(storageServiceProvider);
-      final downloadUrl = await storageService.uploadImageBytes(
-        bytes: bytes,
-        path: fullPath,
-        contentType: contentType,
-      );
-
-      setState(() {
-        _currentUrl = downloadUrl;
+        _currentUrl = placeholder;
         _isUploading = false;
       });
 
-      widget.onImageUploaded(downloadUrl);
+      widget.onImageUploaded(placeholder);
     } catch (e) {
       setState(() {
         _isUploading = false;
-        _errorMessage = 'Upload failed: $e';
+        _errorMessage = 'Error selecting image: $e';
       });
     }
+  }
+
+  void _showPresetPicker() {
+    final colors = context.colors;
+    final presets = _getPresetsForCategory();
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: colors.surfaceElevated,
+        title: Text('Select Placeholder Image Preset', style: AppTextStyles.headingSmall.copyWith(color: colors.textPrimary)),
+        content: SizedBox(
+          width: 480,
+          child: Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: presets.map((assetPath) {
+              final isSelected = _currentUrl == assetPath;
+              return InkWell(
+                onTap: () {
+                  setState(() {
+                    _currentUrl = assetPath;
+                    _previewBytes = null;
+                  });
+                  widget.onImageUploaded(assetPath);
+                  Navigator.of(context).pop();
+                },
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  width: 100,
+                  height: 70,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: isSelected ? colors.primaryRed : colors.border,
+                      width: isSelected ? 2 : 1,
+                    ),
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      Image.asset(assetPath, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Center(child: Icon(Icons.image, color: colors.textSecondary))),
+                      if (isSelected)
+                        Container(
+                          color: colors.primaryRed.withOpacity(0.3),
+                          child: const Center(child: Icon(Icons.check_circle, color: Colors.white, size: 20)),
+                        ),
+                    ],
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text('Close', style: TextStyle(color: colors.textSecondary)),
+          ),
+        ],
+      ),
+    );
   }
 
   void _manualUrlEntry() {
@@ -206,17 +286,23 @@ class _ImageUploaderState extends ConsumerState<ImageUploader> {
                             _previewBytes!,
                             fit: widget.fit,
                           )
-                        : (_currentUrl!.startsWith('http')
-                            ? Image.network(
-                                _currentUrl!,
+                        : (_currentUrl!.startsWith('data:image')
+                            ? Image.memory(
+                                base64Decode(_currentUrl!.split(',').last),
                                 fit: widget.fit,
                                 errorBuilder: (_, __, ___) => _buildPlaceholder(colors),
                               )
-                            : Image.asset(
-                                _currentUrl!,
-                                fit: widget.fit,
-                                errorBuilder: (_, __, ___) => _buildPlaceholder(colors),
-                              )),
+                            : (_currentUrl!.startsWith('http')
+                                ? Image.network(
+                                    _currentUrl!,
+                                    fit: widget.fit,
+                                    errorBuilder: (_, __, ___) => _buildPlaceholder(colors),
+                                  )
+                                : Image.asset(
+                                    _currentUrl!,
+                                    fit: widget.fit,
+                                    errorBuilder: (_, __, ___) => _buildPlaceholder(colors),
+                                  ))),
                   ),
                 )
               else
@@ -253,9 +339,16 @@ class _ImageUploaderState extends ConsumerState<ImageUploader> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         IconButton(
+                          icon: Icon(Icons.collections_outlined, size: 18, color: colors.textPrimary),
+                          onPressed: _showPresetPicker,
+                          tooltip: 'Select Placeholder Preset',
+                          constraints: const BoxConstraints(),
+                          padding: const EdgeInsets.all(6),
+                        ),
+                        IconButton(
                           icon: Icon(Icons.upload_file, size: 18, color: colors.textPrimary),
                           onPressed: _pickAndUpload,
-                          tooltip: 'Upload File',
+                          tooltip: 'Upload / Select Image (Placeholder Mode)',
                           constraints: const BoxConstraints(),
                           padding: const EdgeInsets.all(6),
                         ),
