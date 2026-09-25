@@ -1,6 +1,16 @@
 {
+  "buildCommand": "if [ ! -d \"flutter\" ]; then git clone https://github.com/flutter/flutter.git -b stable --depth 1 flutter; fi && export PATH=\"$PATH:$(pwd)/flutter/bin\" && flutter doctor && flutter build web --release --no-wasm-dry-run && cp web/privacy-policy.html build/web/ 2>/dev/null || true && cp web/privacy.html build/web/ 2>/dev/null || true",
   "outputDirectory": "build/web",
+  "cleanUrls": true,
   "rewrites": [
+    {
+      "source": "/privacy-policy.html",
+      "destination": "/privacy-policy.html"
+    },
+    {
+      "source": "/privacy.html",
+      "destination": "/privacy.html"
+    },
     {
       "source": "/(.*)",
       "destination": "/index.html"

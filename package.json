@@ -8,7 +8,8 @@
     "test": "test"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "flutter build web --release --no-wasm-dry-run && cp web/privacy-policy.html build/web/ 2>/dev/null || true && cp web/privacy.html build/web/ 2>/dev/null || true",
+    "vercel-build": "if [ ! -d \"flutter\" ]; then git clone https://github.com/flutter/flutter.git -b stable --depth 1 flutter; fi && export PATH=\"$PATH:$(pwd)/flutter/bin\" && flutter doctor && flutter build web --release --no-wasm-dry-run && cp web/privacy-policy.html build/web/ 2>/dev/null || true && cp web/privacy.html build/web/ 2>/dev/null || true"
   },
   "keywords": [],
   "author": "",
