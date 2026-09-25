@@ -31,6 +31,7 @@ class ConfirmDialog extends StatelessWidget {
   }) async {
     final result = await showDialog<bool>(
       context: context,
+      useRootNavigator: true,
       barrierDismissible: false,
       builder: (context) => ConfirmDialog(
         title: title,

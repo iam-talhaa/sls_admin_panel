@@ -29,6 +29,7 @@ class _BlogFormViewState extends ConsumerState<BlogFormView> {
   bool _isSaving = false;
 
   late String _id;
+  int _order = 0;
   LocalizedText _title = LocalizedText.empty;
   LocalizedText _excerpt = LocalizedText.empty;
   String _imageUrl = '';
@@ -57,6 +58,7 @@ class _BlogFormViewState extends ConsumerState<BlogFormView> {
       final blog = await ref.read(blogRepositoryProvider).getBlogById(widget.blogId);
       if (blog != null) {
         _id = blog.id;
+        _order = blog.order;
         _title = blog.title;
         _excerpt = blog.excerpt;
         _imageUrl = blog.imageUrl;
@@ -151,6 +153,7 @@ class _BlogFormViewState extends ConsumerState<BlogFormView> {
     try {
       final blog = BlogAdminModel(
         id: isNew ? '' : _id,
+        order: _order,
         title: _title,
         excerpt: _excerpt,
         imageUrl: _imageUrl,
@@ -216,7 +219,13 @@ class _BlogFormViewState extends ConsumerState<BlogFormView> {
                   children: [
                     IconButton(
                       icon: Icon(Icons.arrow_back, color: colors.textPrimary),
-                      onPressed: () => context.go('/blog'),
+                      onPressed: () {
+                        if (context.canPop()) {
+                          context.pop();
+                        } else {
+                          context.go('/blog');
+                        }
+                      },
                     ),
                     const SizedBox(width: 8),
                     Column(
@@ -232,7 +241,13 @@ class _BlogFormViewState extends ConsumerState<BlogFormView> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     OutlinedButton(
-                      onPressed: () => context.go('/blog'),
+                      onPressed: () {
+                        if (context.canPop()) {
+                          context.pop();
+                        } else {
+                          context.go('/blog');
+                        }
+                      },
                       style: OutlinedButton.styleFrom(
                         foregroundColor: colors.textSecondary,
                         side: BorderSide(color: colors.border),

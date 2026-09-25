@@ -21,16 +21,19 @@ class ConciergeRequestsListView extends ConsumerStatefulWidget {
 class _ConciergeRequestsListViewState extends ConsumerState<ConciergeRequestsListView> {
   String _searchQuery = '';
   String _selectedStatus = 'ALL';
+  DateTimeRange? _selectedDateRange;
 
   void _exportCsv(List<ConciergeRequestModel> requests) {
     final colors = context.colors;
     final rows = <List<dynamic>>[
-      ['ID', 'Name', 'Email', 'Phone', 'Status', 'Request Details', 'Admin Notes', 'Date Submitted'],
+      ['ID', 'Name', 'Email', 'Phone', 'Service Category', 'Preferred Date', 'Status', 'Request Details', 'Admin Notes', 'Date Submitted'],
       ...requests.map((r) => [
             r.id,
             r.name,
             r.email,
             r.phone,
+            r.serviceCategory ?? '',
+            r.preferredDate ?? '',
             r.status.label,
             r.requestDetails,
             r.adminNotes,
@@ -65,7 +68,7 @@ class _ConciergeRequestsListViewState extends ConsumerState<ConciergeRequestsLis
       await ref.read(conciergeRequestsRepositoryProvider).deleteConciergeRequest(req.id);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: const Text('Concierge request deleted'), backgroundColor: colors.success),
+          SnackBar(content: const Text('Concierge request deleted from Firebase'), backgroundColor: colors.success),
         );
       }
     }
@@ -133,11 +136,19 @@ class _ConciergeRequestsListViewState extends ConsumerState<ConciergeRequestsLis
                   r.name.toLowerCase().contains(_searchQuery) ||
                   r.email.toLowerCase().contains(_searchQuery) ||
                   r.phone.toLowerCase().contains(_searchQuery) ||
-                  r.requestDetails.toLowerCase().contains(_searchQuery);
+                  r.requestDetails.toLowerCase().contains(_searchQuery) ||
+                  (r.serviceCategory != null && r.serviceCategory!.toLowerCase().contains(_searchQuery)) ||
+                  (r.preferredDate != null && r.preferredDate!.toLowerCase().contains(_searchQuery));
 
               final matchesStatus = _selectedStatus == 'ALL' || r.status.value == _selectedStatus;
 
-              return matchesQuery && matchesStatus;
+              bool matchesDate = true;
+              if (_selectedDateRange != null && r.createdAt != null) {
+                matchesDate = r.createdAt!.isAfter(_selectedDateRange!.start.subtract(const Duration(days: 1))) &&
+                    r.createdAt!.isBefore(_selectedDateRange!.end.add(const Duration(days: 1)));
+              }
+
+              return matchesQuery && matchesStatus && matchesDate;
             }).toList();
 
             return DataTableWidget<ConciergeRequestModel>(
@@ -153,20 +164,61 @@ class _ConciergeRequestsListViewState extends ConsumerState<ConciergeRequestsLis
               onRowTap: (req) => context.go('/concierge-requests/${req.id}'),
               onSearch: (val) => setState(() => _searchQuery = val.trim().toLowerCase()),
               searchHint: 'Search concierge requests...',
-              filterWidget: DropdownButton<String>(
-                value: _selectedStatus,
-                dropdownColor: colors.surfaceElevated,
-                style: AppTextStyles.bodyMedium.copyWith(color: colors.textPrimary),
-                underline: const SizedBox(),
-                items: const [
-                  DropdownMenuItem(value: 'ALL', child: Text('All Statuses')),
-                  DropdownMenuItem(value: 'new', child: Text('New')),
-                  DropdownMenuItem(value: 'in_progress', child: Text('In Progress')),
-                  DropdownMenuItem(value: 'resolved', child: Text('Resolved')),
+              filterWidget: Row(
+                children: [
+                  DropdownButton<String>(
+                    value: _selectedStatus,
+                    dropdownColor: colors.surfaceElevated,
+                    style: AppTextStyles.bodyMedium.copyWith(color: colors.textPrimary),
+                    underline: const SizedBox(),
+                    items: const [
+                      DropdownMenuItem(value: 'ALL', child: Text('All Statuses')),
+                      DropdownMenuItem(value: 'new', child: Text('New')),
+                      DropdownMenuItem(value: 'in_progress', child: Text('In Progress')),
+                      DropdownMenuItem(value: 'resolved', child: Text('Resolved')),
+                    ],
+                    onChanged: (val) {
+                      if (val != null) setState(() => _selectedStatus = val);
+                    },
+                  ),
+                  const SizedBox(width: 8),
+                  if (_selectedDateRange != null)
+                    InputChip(
+                      label: Text(
+                        '${DateFormat('dd MMM').format(_selectedDateRange!.start)} - ${DateFormat('dd MMM').format(_selectedDateRange!.end)}',
+                        style: TextStyle(color: colors.textPrimary, fontSize: 12),
+                      ),
+                      onDeleted: () => setState(() => _selectedDateRange = null),
+                    )
+                  else
+                    IconButton(
+                      icon: Icon(Icons.date_range, size: 18, color: colors.textSecondary),
+                      tooltip: 'Filter by date range',
+                      onPressed: () async {
+                        final themeData = Theme.of(context);
+                        final picked = await showDateRangePicker(
+                          context: context,
+                          firstDate: DateTime(2020),
+                          lastDate: DateTime.now().add(const Duration(days: 365)),
+                          builder: (dialogCtx, child) {
+                            if (child == null) return const SizedBox.shrink();
+                            return Theme(
+                              data: themeData.copyWith(
+                                colorScheme: themeData.colorScheme.copyWith(
+                                  primary: colors.primaryRed,
+                                  surface: colors.surfaceElevated,
+                                ),
+                              ),
+                              child: child,
+                            );
+                          },
+                        );
+                        if (picked != null) {
+                          setState(() => _selectedDateRange = picked);
+                        }
+                      },
+                    ),
                 ],
-                onChanged: (val) {
-                  if (val != null) setState(() => _selectedStatus = val);
-                },
               ),
               rowBuilder: (context, req, index) {
                 return [
@@ -183,11 +235,25 @@ class _ConciergeRequestsListViewState extends ConsumerState<ConciergeRequestsLis
                         Text(req.phone, style: AppTextStyles.bodySmall.copyWith(color: colors.textSecondary, fontSize: 11)),
                     ],
                   ),
-                  Text(
-                    req.requestDetails,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppTextStyles.bodySmall.copyWith(color: colors.textSecondary),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (req.serviceCategory != null && req.serviceCategory!.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 2),
+                          child: Text(
+                            req.serviceCategory!,
+                            style: AppTextStyles.bodySmall.copyWith(color: colors.primaryRed, fontWeight: FontWeight.w600, fontSize: 11),
+                          ),
+                        ),
+                      Text(
+                        req.requestDetails,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTextStyles.bodySmall.copyWith(color: colors.textSecondary),
+                      ),
+                    ],
                   ),
                   Text(
                     req.createdAt != null ? DateFormat('dd MMM yyyy').format(req.createdAt!) : '-',

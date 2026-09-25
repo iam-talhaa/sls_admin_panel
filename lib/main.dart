@@ -6,7 +6,6 @@ import 'core/providers/theme_mode_provider.dart';
 import 'core/routes/app_router.dart';
 import 'core/theme/app_theme.dart';
 import 'firebase_options.dart';
-import 'screens/auth_gate.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -31,8 +30,6 @@ class SlsAdminApp extends ConsumerWidget {
       darkTheme: AppTheme.darkTheme,
       themeMode: themeMode,
       routerConfig: router,
-      builder: (context, child) =>
-          AuthGate(homeBuilder: () => child ?? const SizedBox.shrink()),
     );
   }
 }

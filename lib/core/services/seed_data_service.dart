@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../features/blog/data/repositories/blog_repository.dart';
+import '../../features/concierge/data/services/concierge_service.dart';
 import '../../features/destinations/data/repositories/destinations_repository.dart';
 import '../../features/fleet/data/repositories/fleet_repository.dart';
 
@@ -8,6 +9,7 @@ final seedDataServiceProvider = Provider<SeedDataService>((ref) {
     fleetRepository: ref.watch(fleetRepositoryProvider),
     destinationsRepository: ref.watch(destinationsRepositoryProvider),
     blogRepository: ref.watch(blogRepositoryProvider),
+    conciergeService: ref.watch(conciergeServiceProvider),
   );
 });
 
@@ -15,11 +17,13 @@ class SeedDataService {
   final FleetRepository fleetRepository;
   final DestinationsRepository destinationsRepository;
   final BlogRepository blogRepository;
+  final ConciergeService conciergeService;
 
   SeedDataService({
     required this.fleetRepository,
     required this.destinationsRepository,
     required this.blogRepository,
+    required this.conciergeService,
   });
 
   Future<void> seedInitialData({bool force = true}) async {
@@ -27,6 +31,7 @@ class SeedDataService {
       fleetRepository.seedInitialJets(force: force),
       destinationsRepository.seedInitialDestinations(force: force),
       blogRepository.seedInitialBlogs(force: force),
+      conciergeService.seedInitialData(force: force),
     ]);
   }
 }

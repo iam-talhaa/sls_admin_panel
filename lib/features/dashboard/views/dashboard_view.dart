@@ -196,7 +196,7 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final crossAxisCount = constraints.maxWidth > 1200
-            ? 5
+            ? 6
             : (constraints.maxWidth > 800 ? 3 : 2);
 
         return GridView.count(
@@ -205,7 +205,7 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
           physics: const NeverScrollableScrollPhysics(),
           crossAxisSpacing: 16,
           mainAxisSpacing: 16,
-          childAspectRatio: constraints.maxWidth > 1200 ? 1.75 : 1.6,
+          childAspectRatio: constraints.maxWidth > 1200 ? 1.6 : 1.5,
           children: [
             _buildStatCard(
               title: 'Fleet Jets',
@@ -246,6 +246,14 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
               color: const Color(0xFFBF5AF2),
               colors: colors,
               onTap: () => context.go('/concierge-requests'),
+            ),
+            _buildStatCard(
+              title: 'App Users',
+              count: '${stats.totalUsers}',
+              icon: Icons.people_outline,
+              color: const Color(0xFF30D158),
+              colors: colors,
+              onTap: () => context.go('/users'),
             ),
           ],
         );

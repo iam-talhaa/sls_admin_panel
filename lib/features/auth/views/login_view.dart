@@ -281,6 +281,25 @@ class _LoginViewState extends ConsumerState<LoginView> {
                         style: AppTextStyles.bodySmall.copyWith(fontSize: 11, color: colors.textMuted),
                       ),
                     ),
+                    const SizedBox(height: 12),
+                    Center(
+                      child: InkWell(
+                        onTap: () => context.push('/privacy-policy'),
+                        borderRadius: BorderRadius.circular(4),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          child: Text(
+                            'Privacy Policy',
+                            style: AppTextStyles.bodySmall.copyWith(
+                              fontSize: 12,
+                              color: colors.textSecondary,
+                              decoration: TextDecoration.underline,
+                              decorationColor: colors.textMuted,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),

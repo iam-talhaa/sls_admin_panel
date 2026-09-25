@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 import '../../../core/theme/app_color_scheme.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/widgets/confirm_dialog.dart';
@@ -19,6 +18,7 @@ class BlogListView extends ConsumerStatefulWidget {
 
 class _BlogListViewState extends ConsumerState<BlogListView> {
   String _searchQuery = '';
+  bool _isSyncing = false;
 
   Future<void> _deleteBlog(BlogAdminModel blog) async {
     final colors = context.colors;
@@ -48,6 +48,52 @@ class _BlogListViewState extends ConsumerState<BlogListView> {
     }
   }
 
+  Future<void> _duplicateBlog(BlogAdminModel blog) async {
+    final colors = context.colors;
+    try {
+      final newId = 'blog_${DateTime.now().millisecondsSinceEpoch}';
+      final duplicate = blog.copyWith(
+        id: newId,
+        title: blog.title.copyWith(en: '${blog.title.en} (Copy)'),
+        order: blog.order + 1,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+      await ref.read(blogRepositoryProvider).saveBlog(duplicate);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: const Text('Blog post duplicated successfully in Firebase'), backgroundColor: colors.success),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error duplicating blog post: $e'), backgroundColor: colors.error),
+        );
+      }
+    }
+  }
+
+  Future<void> _onReorder(List<BlogAdminModel> currentList, int oldIndex, int newIndex) async {
+    final colors = context.colors;
+    if (newIndex > oldIndex) {
+      newIndex -= 1;
+    }
+    final items = List<BlogAdminModel>.from(currentList);
+    final movedItem = items.removeAt(oldIndex);
+    items.insert(newIndex, movedItem);
+
+    try {
+      await ref.read(blogRepositoryProvider).updateBlogsOrder(items);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error saving new order: $e'), backgroundColor: colors.error),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
@@ -68,18 +114,91 @@ class _BlogListViewState extends ConsumerState<BlogListView> {
               children: [
                 Text('Luxury Journal & Blog Posts', style: AppTextStyles.headingMedium.copyWith(color: colors.textPrimary)),
                 const SizedBox(height: 4),
-                Text('Publish VIP aviation insights, alpine travel guides, and lifestyle articles.', style: AppTextStyles.subtitle.copyWith(color: colors.textSecondary)),
+                Text('Manage VIP aviation insights, destination guides, and lifestyle articles for the mobile app.', style: AppTextStyles.subtitle.copyWith(color: colors.textSecondary)),
               ],
             ),
-            ElevatedButton.icon(
-              onPressed: () => context.go('/blog/new'),
-              icon: const Icon(Icons.add, size: 18),
-              label: const Text('New Post'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: colors.primaryRed,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-              ),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Tooltip(
+                  message: 'Force-sync all 11 default blog articles to Firebase Firestore',
+                  child: OutlinedButton.icon(
+                    onPressed: _isSyncing
+                        ? null
+                        : () async {
+                            final messenger = ScaffoldMessenger.of(context);
+                            final confirmed = await ConfirmDialog.show(
+                              context,
+                              title: 'Sync Blogs to Firebase',
+                              message:
+                                  'This will sync all 11 default blog articles with complete structured content blocks (paragraphs, subheadings, bullet lists, link references) to Firestore.\n\nProceed?',
+                              confirmLabel: 'Sync Now',
+                              icon: Icons.cloud_sync_outlined,
+                            );
+
+                            if (confirmed && mounted) {
+                              setState(() => _isSyncing = true);
+                              try {
+                                await ref
+                                    .read(blogRepositoryProvider)
+                                    .seedInitialBlogs(force: true);
+                                if (mounted) {
+                                  messenger.showSnackBar(
+                                    SnackBar(
+                                      content: const Text(
+                                          '✅ All 11 blog articles synced to Firebase successfully!'),
+                                      backgroundColor: colors.success,
+                                    ),
+                                  );
+                                }
+                              } catch (e) {
+                                if (mounted) {
+                                  messenger.showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                          'Sync error: $e\n(Make sure you are logged in and Firestore rules allow writes)'),
+                                      backgroundColor: colors.error,
+                                      duration: const Duration(seconds: 6),
+                                    ),
+                                  );
+                                }
+                              } finally {
+                                if (mounted) {
+                                  setState(() => _isSyncing = false);
+                                }
+                              }
+                            }
+                          },
+                    icon: _isSyncing
+                        ? const SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Icon(Icons.cloud_sync_outlined, size: 18),
+                    label: Text(_isSyncing ? 'Syncing...' : 'Sync to Firebase'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: colors.textSecondary,
+                      side: BorderSide(color: colors.border),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                ElevatedButton.icon(
+                  onPressed: () => context.go('/blog/new'),
+                  icon: const Icon(Icons.add, size: 18),
+                  label: const Text('New Post'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: colors.primaryRed,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -184,7 +303,7 @@ class _BlogListViewState extends ConsumerState<BlogListView> {
               ),
               child: LayoutBuilder(
                 builder: (context, constraints) {
-                  const double minTableWidth = 900;
+                  const double minTableWidth = 920;
                   final effectiveWidth = constraints.maxWidth < minTableWidth ? minTableWidth : constraints.maxWidth;
 
                   return SingleChildScrollView(
@@ -205,24 +324,25 @@ class _BlogListViewState extends ConsumerState<BlogListView> {
                             ),
                             child: Row(
                               children: [
+                                const SizedBox(width: 32),
                                 SizedBox(
                                   width: 80,
-                                  child: Text('IMAGE', style: TextStyle(color: colors.textSecondary, fontSize: 12, fontWeight: FontWeight.w600)),
+                                  child: Text('ID', style: TextStyle(color: colors.textSecondary, fontSize: 12, fontWeight: FontWeight.w600)),
                                 ),
                                 Expanded(
                                   flex: 4,
                                   child: Text('ARTICLE TITLE & EXCERPT', style: TextStyle(color: colors.textSecondary, fontSize: 12, fontWeight: FontWeight.w600)),
                                 ),
-                                Expanded(
-                                  flex: 2,
-                                  child: Text('PUBLISHED DATE', style: TextStyle(color: colors.textSecondary, fontSize: 12, fontWeight: FontWeight.w600)),
+                                SizedBox(
+                                  width: 130,
+                                  child: Text('CONTENT BLOCKS', style: TextStyle(color: colors.textSecondary, fontSize: 12, fontWeight: FontWeight.w600)),
                                 ),
                                 SizedBox(
-                                  width: 155,
+                                  width: 145,
                                   child: Text('STATUS', style: TextStyle(color: colors.textSecondary, fontSize: 12, fontWeight: FontWeight.w600)),
                                 ),
                                 SizedBox(
-                                  width: 100,
+                                  width: 130,
                                   child: Align(
                                     alignment: Alignment.centerRight,
                                     child: Text('ACTIONS', style: TextStyle(color: colors.textSecondary, fontSize: 12, fontWeight: FontWeight.w600)),
@@ -233,35 +353,59 @@ class _BlogListViewState extends ConsumerState<BlogListView> {
                           ),
                           Divider(height: 1, color: colors.border),
 
-                          // Blog Items List
-                          Column(
-                            children: [
-                              for (int index = 0; index < filtered.length; index++) ...[
-                                if (index > 0) Divider(height: 1, color: colors.border),
-                                Material(
+                          // Reorderable Blog Items List
+                          ReorderableListView.builder(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            itemCount: filtered.length,
+                            onReorder: (oldIdx, newIdx) => _onReorder(filtered, oldIdx, newIdx),
+                            buildDefaultDragHandles: false,
+                            itemBuilder: (context, index) {
+                              final blog = filtered[index];
+                              return Container(
+                                key: ValueKey(blog.id.isNotEmpty ? blog.id : 'blog_$index'),
+                                decoration: BoxDecoration(
+                                  border: Border(bottom: BorderSide(color: colors.border)),
+                                ),
+                                child: Material(
                                   color: Colors.transparent,
                                   child: InkWell(
-                                    onTap: () => context.go('/blog/${filtered[index].id}'),
+                                    onTap: () => context.go('/blog/${blog.id}'),
                                     hoverColor: colors.tableRowHover,
                                     child: Padding(
                                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                                       child: Row(
                                         children: [
-                                          // Thumbnail
+                                          // Drag Handle
+                                          ReorderableDragStartListener(
+                                            index: index,
+                                            child: MouseRegion(
+                                              cursor: SystemMouseCursors.grab,
+                                              child: Padding(
+                                                padding: const EdgeInsets.only(right: 12.0),
+                                                child: Icon(Icons.drag_indicator, color: colors.textSecondary, size: 20),
+                                              ),
+                                            ),
+                                          ),
+
+                                          // ID Badge / Icon
                                           Container(
                                             width: 60,
-                                            height: 40,
+                                            height: 38,
                                             decoration: BoxDecoration(
                                               color: colors.surfaceElevatedHigher,
                                               borderRadius: BorderRadius.circular(6),
                                               border: Border.all(color: colors.border),
                                             ),
-                                            clipBehavior: Clip.antiAlias,
-                                            child: filtered[index].imageUrl.isNotEmpty
-                                                ? (filtered[index].imageUrl.startsWith('http')
-                                                    ? Image.network(filtered[index].imageUrl, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Icon(Icons.article, color: colors.textSecondary, size: 18))
-                                                    : Image.asset(filtered[index].imageUrl, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Icon(Icons.article, color: colors.textSecondary, size: 18)))
-                                                : Icon(Icons.article, color: colors.textSecondary, size: 18),
+                                            alignment: Alignment.center,
+                                            child: Text(
+                                              blog.id.replaceAll('blog_', '#'),
+                                              style: TextStyle(
+                                                color: colors.primaryRed,
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 13,
+                                              ),
+                                            ),
                                           ),
                                           const SizedBox(width: 20),
 
@@ -272,13 +416,13 @@ class _BlogListViewState extends ConsumerState<BlogListView> {
                                               crossAxisAlignment: CrossAxisAlignment.start,
                                               children: [
                                                 Text(
-                                                  filtered[index].title.en.isNotEmpty ? filtered[index].title.en : 'Untitled Post',
+                                                  blog.title.en.isNotEmpty ? blog.title.en : 'Untitled Post',
                                                   style: AppTextStyles.bodyMedium.copyWith(color: colors.textPrimary, fontWeight: FontWeight.w600),
                                                 ),
-                                                if (filtered[index].excerpt.en.isNotEmpty)
+                                                if (blog.excerpt.en.isNotEmpty)
                                                   Text(
-                                                    filtered[index].excerpt.en,
-                                                    maxLines: 1,
+                                                    blog.excerpt.en,
+                                                    maxLines: 2,
                                                     overflow: TextOverflow.ellipsis,
                                                     style: AppTextStyles.bodySmall.copyWith(color: colors.textSecondary),
                                                   ),
@@ -286,54 +430,70 @@ class _BlogListViewState extends ConsumerState<BlogListView> {
                                             ),
                                           ),
 
-                                          // Published Date
-                                          Expanded(
-                                            flex: 2,
-                                            child: Text(
-                                              filtered[index].publishedAt != null
-                                                  ? DateFormat('dd MMM yyyy, HH:mm').format(filtered[index].publishedAt!)
-                                                  : (filtered[index].createdAt != null
-                                                      ? 'Draft (${DateFormat('dd MMM yyyy').format(filtered[index].createdAt!)})'
-                                                      : 'Draft'),
-                                              style: AppTextStyles.bodySmall.copyWith(color: colors.textSecondary),
+                                          // Content blocks count
+                                          SizedBox(
+                                            width: 130,
+                                            child: Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                              decoration: BoxDecoration(
+                                                color: colors.surfaceElevatedHigher,
+                                                borderRadius: BorderRadius.circular(6),
+                                                border: Border.all(color: colors.border),
+                                              ),
+                                              child: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Icon(Icons.layers_outlined, size: 14, color: colors.textSecondary),
+                                                  const SizedBox(width: 6),
+                                                  Text(
+                                                    '${blog.contentBlocks.length} Blocks',
+                                                    style: AppTextStyles.bodySmall.copyWith(color: colors.textPrimary, fontSize: 11),
+                                                  ),
+                                                ],
+                                              ),
                                             ),
                                           ),
 
                                           // Status Switch
                                           SizedBox(
-                                            width: 155,
+                                            width: 145,
                                             child: Row(
                                               mainAxisSize: MainAxisSize.min,
                                               children: [
                                                 Transform.scale(
                                                   scale: 0.8,
                                                   child: Switch(
-                                                    value: filtered[index].isPublished,
+                                                    value: blog.isPublished,
                                                     onChanged: (val) {
-                                                      ref.read(blogRepositoryProvider).togglePublishStatus(filtered[index].id, val);
+                                                      ref.read(blogRepositoryProvider).togglePublishStatus(blog.id, val);
                                                     },
                                                   ),
                                                 ),
                                                 const SizedBox(width: 4),
-                                                StatusBadge.fromStatus(filtered[index].isPublished ? 'Published' : 'Draft'),
+                                                StatusBadge.fromStatus(blog.isPublished ? 'Published' : 'Draft'),
                                               ],
                                             ),
                                           ),
 
                                           // Actions
                                           SizedBox(
-                                            width: 100,
+                                            width: 130,
                                             child: Row(
                                               mainAxisAlignment: MainAxisAlignment.end,
                                               children: [
                                                 IconButton(
                                                   icon: Icon(Icons.edit_outlined, size: 18, color: colors.textPrimary),
-                                                  onPressed: () => context.go('/blog/${filtered[index].id}'),
+                                                  onPressed: () => context.go('/blog/${blog.id}'),
                                                   tooltip: 'Edit Post',
                                                 ),
                                                 IconButton(
+                                                  icon: Icon(Icons.copy_outlined, size: 18, color: colors.textSecondary),
+                                                  onPressed: () => _duplicateBlog(blog),
+                                                  tooltip: 'Duplicate Post',
+                                                ),
+                                                IconButton(
                                                   icon: Icon(Icons.delete_outline, size: 18, color: colors.error),
-                                                  onPressed: () => _deleteBlog(filtered[index]),
+                                                  onPressed: () => _deleteBlog(blog),
                                                   tooltip: 'Delete Post',
                                                 ),
                                               ],
@@ -344,8 +504,8 @@ class _BlogListViewState extends ConsumerState<BlogListView> {
                                     ),
                                   ),
                                 ),
-                              ],
-                            ],
+                              );
+                            },
                           ),
                         ],
                       ),

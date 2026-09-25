@@ -26,12 +26,16 @@ class _QuoteRequestsListViewState extends ConsumerState<QuoteRequestsListView> {
   void _exportCsv(List<QuoteRequestModel> quotes) {
     final colors = context.colors;
     final rows = <List<dynamic>>[
-      ['ID', 'Name', 'Email', 'Phone', 'Status', 'Message', 'Admin Notes', 'Date Submitted'],
+      ['ID', 'Name', 'Email', 'Phone', 'Route', 'Flight Date', 'Passengers', 'Jet Type', 'Status', 'Message', 'Admin Notes', 'Date Submitted'],
       ...quotes.map((q) => [
             q.id,
             q.firstName,
             q.email,
             q.phone,
+            (q.departure != null && q.destination != null) ? '${q.departure} → ${q.destination}' : '',
+            q.departureDate ?? '',
+            q.passengers ?? '',
+            q.jetType ?? '',
             q.status.label,
             q.message,
             q.adminNotes,
@@ -66,7 +70,7 @@ class _QuoteRequestsListViewState extends ConsumerState<QuoteRequestsListView> {
       await ref.read(quoteRequestsRepositoryProvider).deleteQuoteRequest(quote.id);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: const Text('Quote request deleted'), backgroundColor: colors.success),
+          SnackBar(content: const Text('Quote request deleted from Firebase'), backgroundColor: colors.success),
         );
       }
     }
@@ -134,7 +138,10 @@ class _QuoteRequestsListViewState extends ConsumerState<QuoteRequestsListView> {
                   q.firstName.toLowerCase().contains(_searchQuery) ||
                   q.email.toLowerCase().contains(_searchQuery) ||
                   q.phone.toLowerCase().contains(_searchQuery) ||
-                  q.message.toLowerCase().contains(_searchQuery);
+                  q.message.toLowerCase().contains(_searchQuery) ||
+                  (q.departure != null && q.departure!.toLowerCase().contains(_searchQuery)) ||
+                  (q.destination != null && q.destination!.toLowerCase().contains(_searchQuery)) ||
+                  (q.jetType != null && q.jetType!.toLowerCase().contains(_searchQuery));
 
               final matchesStatus = _selectedStatus == 'ALL' || q.status.value == _selectedStatus;
 
@@ -191,19 +198,23 @@ class _QuoteRequestsListViewState extends ConsumerState<QuoteRequestsListView> {
                       icon: Icon(Icons.date_range, size: 18, color: colors.textSecondary),
                       tooltip: 'Filter by date range',
                       onPressed: () async {
+                        final themeData = Theme.of(context);
                         final picked = await showDateRangePicker(
                           context: context,
                           firstDate: DateTime(2020),
                           lastDate: DateTime.now().add(const Duration(days: 365)),
-                          builder: (context, child) => Theme(
-                            data: Theme.of(context).copyWith(
-                              colorScheme: Theme.of(context).colorScheme.copyWith(
-                                primary: colors.primaryRed,
-                                surface: colors.surfaceElevated,
+                          builder: (dialogCtx, child) {
+                            if (child == null) return const SizedBox.shrink();
+                            return Theme(
+                              data: themeData.copyWith(
+                                colorScheme: themeData.colorScheme.copyWith(
+                                  primary: colors.primaryRed,
+                                  surface: colors.surfaceElevated,
+                                ),
                               ),
-                            ),
-                            child: child!,
-                          ),
+                              child: child,
+                            );
+                          },
                         );
                         if (picked != null) {
                           setState(() => _selectedDateRange = picked);

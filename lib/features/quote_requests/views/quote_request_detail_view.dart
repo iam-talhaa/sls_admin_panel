@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/theme/app_color_scheme.dart';
 import '../../../core/constants/app_text_styles.dart';
+import '../../../core/widgets/confirm_dialog.dart';
 import '../../../core/widgets/status_badge.dart';
 import '../data/models/quote_request_model.dart';
 import '../data/repositories/quote_requests_repository.dart';
@@ -81,7 +82,7 @@ class _QuoteRequestDetailViewState extends ConsumerState<QuoteRequestDetailView>
       });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: const Text('Admin notes saved!'), backgroundColor: colors.success),
+          SnackBar(content: const Text('Admin notes saved to Firebase!'), backgroundColor: colors.success),
         );
       }
     } catch (e) {
@@ -90,6 +91,28 @@ class _QuoteRequestDetailViewState extends ConsumerState<QuoteRequestDetailView>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error saving notes: $e'), backgroundColor: colors.error),
         );
+      }
+    }
+  }
+
+  Future<void> _deleteQuote() async {
+    if (_quote == null) return;
+    final colors = context.colors;
+    final confirmed = await ConfirmDialog.show(
+      context,
+      title: 'Delete Quote Request',
+      message: 'Are you sure you want to permanently delete this quote request from ${_quote!.firstName.isNotEmpty ? _quote!.firstName : _quote!.email}?',
+      confirmLabel: 'Delete',
+      isDestructive: true,
+    );
+
+    if (confirmed && mounted) {
+      await ref.read(quoteRequestsRepositoryProvider).deleteQuoteRequest(_quote!.id);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: const Text('Quote request deleted from Firebase'), backgroundColor: colors.success),
+        );
+        context.go('/quote-requests');
       }
     }
   }
@@ -122,6 +145,7 @@ class _QuoteRequestDetailViewState extends ConsumerState<QuoteRequestDetailView>
     if (_quote == null) {
       return Center(
         child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Text('Quote request not found.', style: AppTextStyles.headingSmall.copyWith(color: colors.textPrimary)),
             const SizedBox(height: 12),
@@ -134,44 +158,76 @@ class _QuoteRequestDetailViewState extends ConsumerState<QuoteRequestDetailView>
       );
     }
 
+    final hasFlightDetails = (_quote!.departure != null && _quote!.departure!.isNotEmpty) ||
+        (_quote!.destination != null && _quote!.destination!.isNotEmpty) ||
+        (_quote!.departureDate != null && _quote!.departureDate!.isNotEmpty) ||
+        (_quote!.passengers != null && _quote!.passengers!.isNotEmpty) ||
+        (_quote!.jetType != null && _quote!.jetType!.isNotEmpty);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         // Header
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        Wrap(
+          alignment: WrapAlignment.spaceBetween,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 12,
+          runSpacing: 12,
           children: [
             Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
                 IconButton(
                   icon: Icon(Icons.arrow_back, color: colors.textPrimary),
-                  onPressed: () => context.go('/quote-requests'),
+                  onPressed: () {
+                    if (context.canPop()) {
+                      context.pop();
+                    } else {
+                      context.go('/quote-requests');
+                    }
+                  },
+                  tooltip: 'Back to List',
                 ),
                 const SizedBox(width: 8),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('Quote Request Details', style: AppTextStyles.headingMedium.copyWith(color: colors.textPrimary)),
-                    Text('ID: ${_quote!.id}', style: AppTextStyles.subtitle.copyWith(color: colors.textSecondary)),
+                    Text('Document ID: ${_quote!.id}', style: AppTextStyles.subtitle.copyWith(color: colors.textSecondary)),
                   ],
                 ),
               ],
             ),
             Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
                 StatusBadge.fromStatus(_quote!.status.value),
                 const SizedBox(width: 12),
-                DropdownButton<QuoteRequestStatus>(
-                  value: _quote!.status,
-                  dropdownColor: colors.surfaceElevated,
-                  style: AppTextStyles.bodyMedium.copyWith(color: colors.textPrimary),
-                  underline: const SizedBox(),
-                  items: QuoteRequestStatus.values.map((s) {
-                    return DropdownMenuItem(value: s, child: Text(s.label));
-                  }).toList(),
-                  onChanged: (val) {
-                    if (val != null) _updateStatus(val);
-                  },
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: colors.surfaceElevated,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: colors.border),
+                  ),
+                  child: DropdownButton<QuoteRequestStatus>(
+                    value: _quote!.status,
+                    dropdownColor: colors.surfaceElevated,
+                    style: AppTextStyles.bodyMedium.copyWith(color: colors.textPrimary),
+                    underline: const SizedBox(),
+                    items: QuoteRequestStatus.values.map((s) {
+                      return DropdownMenuItem(value: s, child: Text(s.label));
+                    }).toList(),
+                    onChanged: (val) {
+                      if (val != null) _updateStatus(val);
+                    },
+                  ),
+                ),
+                const SizedBox(width: 12),
+                IconButton(
+                  icon: Icon(Icons.delete_outline, color: colors.error),
+                  onPressed: _deleteQuote,
+                  tooltip: 'Delete Request',
                 ),
               ],
             ),
@@ -207,7 +263,7 @@ class _QuoteRequestDetailViewState extends ConsumerState<QuoteRequestDetailView>
                   Divider(height: 24, color: colors.border),
                   _buildInfoRow(
                     'Email Address',
-                    _quote!.email,
+                    _quote!.email.isNotEmpty ? _quote!.email : 'Not provided',
                     colors,
                     trailing: _quote!.email.isNotEmpty
                         ? IconButton(
@@ -238,6 +294,10 @@ class _QuoteRequestDetailViewState extends ConsumerState<QuoteRequestDetailView>
                         : 'Unknown',
                     colors,
                   ),
+                  if (_quote!.userId != null && _quote!.userId!.isNotEmpty) ...[
+                    Divider(height: 24, color: colors.border),
+                    _buildInfoRow('User ID', _quote!.userId!, colors),
+                  ],
                 ],
               ),
             );
@@ -261,6 +321,55 @@ class _QuoteRequestDetailViewState extends ConsumerState<QuoteRequestDetailView>
                 children: [
                   Text('Inquiry Details & Route Requirements', style: AppTextStyles.headingSmall.copyWith(color: colors.textPrimary)),
                   const SizedBox(height: 16),
+
+                  if (hasFlightDetails) ...[
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      margin: const EdgeInsets.only(bottom: 16),
+                      decoration: BoxDecoration(
+                        color: colors.surfaceElevatedHigher,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: colors.border),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if ((_quote!.departure != null && _quote!.departure!.isNotEmpty) ||
+                              (_quote!.destination != null && _quote!.destination!.isNotEmpty))
+                            Row(
+                              children: [
+                                Icon(Icons.flight_takeoff, size: 18, color: colors.primaryRed),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    '${_quote!.departure ?? 'Origin'} → ${_quote!.destination ?? 'Destination'}',
+                                    style: AppTextStyles.bodyMedium.copyWith(color: colors.textPrimary, fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          const SizedBox(height: 12),
+                          Wrap(
+                            spacing: 16,
+                            runSpacing: 8,
+                            children: [
+                              if (_quote!.departureDate != null && _quote!.departureDate!.isNotEmpty)
+                                _buildBadgeInfo('Departure', _quote!.departureDate!, colors),
+                              if (_quote!.returnDate != null && _quote!.returnDate!.isNotEmpty)
+                                _buildBadgeInfo('Return', _quote!.returnDate!, colors),
+                              if (_quote!.passengers != null && _quote!.passengers!.isNotEmpty)
+                                _buildBadgeInfo('Passengers', '${_quote!.passengers} Pax', colors),
+                              if (_quote!.jetType != null && _quote!.jetType!.isNotEmpty)
+                                _buildBadgeInfo('Aircraft', _quote!.jetType!, colors),
+                              if (_quote!.tripType != null && _quote!.tripType!.isNotEmpty)
+                                _buildBadgeInfo('Trip', _quote!.tripType!, colors),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(16),
@@ -279,7 +388,7 @@ class _QuoteRequestDetailViewState extends ConsumerState<QuoteRequestDetailView>
                   // Admin Internal Notes
                   Text('Internal Staff Notes', style: AppTextStyles.headingSmall.copyWith(color: colors.textPrimary)),
                   const SizedBox(height: 8),
-                  Text('Private notes for charter agents (not visible to client).', style: AppTextStyles.subtitle.copyWith(color: colors.textSecondary)),
+                  Text('Private notes for charter agents (persisted in Firestore).', style: AppTextStyles.subtitle.copyWith(color: colors.textSecondary)),
                   const SizedBox(height: 12),
                   TextField(
                     controller: _notesController,
@@ -299,8 +408,8 @@ class _QuoteRequestDetailViewState extends ConsumerState<QuoteRequestDetailView>
                           : const Icon(Icons.save, size: 16),
                       label: Text(_isSavingNotes ? 'Saving...' : 'Save Notes'),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: colors.surfaceElevatedHigher,
-                        foregroundColor: colors.textPrimary,
+                        backgroundColor: colors.primaryRed,
+                        foregroundColor: Colors.white,
                       ),
                     ),
                   ),
@@ -329,6 +438,24 @@ class _QuoteRequestDetailViewState extends ConsumerState<QuoteRequestDetailView>
           },
         ),
       ],
+    );
+  }
+
+  Widget _buildBadgeInfo(String label, String val, dynamic colors) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: colors.surfaceElevated,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: colors.border),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text('$label: ', style: AppTextStyles.bodySmall.copyWith(color: colors.textSecondary, fontSize: 11)),
+          Text(val, style: AppTextStyles.bodySmall.copyWith(color: colors.textPrimary, fontWeight: FontWeight.bold, fontSize: 11)),
+        ],
+      ),
     );
   }
 

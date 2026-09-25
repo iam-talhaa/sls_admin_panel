@@ -209,7 +209,6 @@ class _AdminScaffoldState extends ConsumerState<AdminScaffold> {
                 // Page Content Area with smooth scrolling
                 Expanded(
                   child: SingleChildScrollView(
-                    key: ValueKey(widget.currentRoute),
                     padding: const EdgeInsets.all(24.0),
                     child: widget.child,
                   ),

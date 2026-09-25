@@ -200,7 +200,13 @@ class _DestinationFormViewState extends ConsumerState<DestinationFormView> {
                   children: [
                     IconButton(
                       icon: Icon(Icons.arrow_back, color: colors.textPrimary),
-                      onPressed: () => context.go('/destinations'),
+                      onPressed: () {
+                        if (context.canPop()) {
+                          context.pop();
+                        } else {
+                          context.go('/destinations');
+                        }
+                      },
                     ),
                     const SizedBox(width: 8),
                     Column(
@@ -216,7 +222,13 @@ class _DestinationFormViewState extends ConsumerState<DestinationFormView> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     OutlinedButton(
-                      onPressed: () => context.go('/destinations'),
+                      onPressed: () {
+                        if (context.canPop()) {
+                          context.pop();
+                        } else {
+                          context.go('/destinations');
+                        }
+                      },
                       style: OutlinedButton.styleFrom(
                         foregroundColor: colors.textSecondary,
                         side: BorderSide(color: colors.border),

@@ -1,26 +1,11 @@
 import 'dart:async';
+import 'dart:developer' as dev;
+
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../../../../core/models/localized_text.dart';
 import '../models/concierge_model.dart';
-
-// ==============================================================================
-// HANDOFF NOTE FOR BACKEND INTEGRATION:
-// This is a stand-in mock service for Concierge Services content management.
-// When connecting to the real backend, replace the local in-memory store in this
-// service with HTTP client calls (e.g. Dio or http) to endpoints matching:
-//   - GET    /api/admin/concierge/banner
-//   - PUT    /api/admin/concierge/banner
-//   - GET    /api/admin/concierge/categories
-//   - GET    /api/admin/concierge/categories/:id
-//   - POST   /api/admin/concierge/categories
-//   - PUT    /api/admin/concierge/categories/:id
-//   - DELETE /api/admin/concierge/categories/:id
-//   - PUT    /api/admin/concierge/categories/reorder
-//   - POST   /api/admin/concierge/categories/:id/features
-//   - PUT    /api/admin/concierge/categories/:id/features/:featureId
-//   - DELETE /api/admin/concierge/categories/:id/features/:featureId
-//   - PUT    /api/admin/concierge/categories/:id/features/reorder
-// ==============================================================================
 
 final conciergeServiceProvider = Provider<ConciergeService>((ref) {
   return ConciergeService();
@@ -31,14 +16,16 @@ final conciergeBannerStreamProvider = StreamProvider<ConciergeBanner>((ref) {
   return service.bannerStream;
 });
 
-final conciergeCategoriesStreamProvider = StreamProvider<List<ConciergeCategory>>((ref) {
+final conciergeCategoriesStreamProvider =
+    StreamProvider<List<ConciergeCategory>>((ref) {
   final service = ref.watch(conciergeServiceProvider);
   return service.categoriesStream;
 });
 
 class ConciergeService {
-  // Singleton in-memory state so changes persist across screen navigations during the session
-  static ConciergeBanner _banner = const ConciergeBanner(
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
+  static const ConciergeBanner defaultBanner = ConciergeBanner(
     title: LocalizedText(
       en: 'Bespoke Luxury & Concierge Services',
       fr: 'Services de Conciergerie de Luxe sur Mesure',
@@ -46,16 +33,20 @@ class ConciergeService {
       ar: 'خدمات الكونسيرج الفاخرة والمخصصة',
     ),
     subtitle: LocalizedText(
-      en: 'Seamless 5-star hotel reservations, private chauffeur transfers, VIP ground assistance, diplomatic support, and curated global itineraries.',
-      fr: 'Réservations d\'hôtels 5 étoiles, transferts privés, assistance VIP au sol, soutien diplomatique et itinéraires mondiaux sur mesure.',
-      de: 'Nahtlose 5-Sterne-Hotelreservierungen, private Chauffeur-Transfers, VIP-Bodenbetreuung, diplomatische Unterstützung und kuratierte Reiserouten.',
-      ar: 'حجوزات سلسة في فنادق 5 نجوم، وتنقلات خاصة بسائق، ومساعدة كبار الشخصيات على أرض المطار، ودعم دبلوماسي، وبرامج رحلات مصممة بعناية.',
+      en:
+          'Seamless 5-star hotel reservations, private chauffeur transfers, VIP ground assistance, diplomatic support, and curated global itineraries.',
+      fr:
+          'Réservations d\'hôtels 5 étoiles, transferts privés, assistance VIP au sol, soutien diplomatique et itinéraires mondiaux sur mesure.',
+      de:
+          'Nahtlose 5-Sterne-Hotelreservierungen, private Chauffeur-Transfers, VIP-Bodenbetreuung, diplomatische Unterstützung und kuratierte Reiserouten.',
+      ar:
+          'حجوزات سلسة في فنادق 5 نجوم، وتنقلات خاصة بسائق، ومساعدة كبار الشخصيات على أرض المطار، ودعم دبلوماسي، وبرامج رحلات مصممة بعناية.',
     ),
     imageUrl: 'assets/conciergeService.png',
   );
 
-  static List<ConciergeCategory> _categories = [
-    const ConciergeCategory(
+  static const List<ConciergeCategory> defaultCategories = [
+    ConciergeCategory(
       id: 'cat_hotel_booking',
       slug: 'hotel-booking',
       sortOrder: 1,
@@ -78,10 +69,14 @@ class ConciergeService {
         ar: 'حجوزات مخصصة في فنادق 5 نجوم وشاليهات خاصة',
       ),
       description: LocalizedText(
-        en: 'Privileged access and elite partnerships with world-renowned luxury hotel brands, private alpine ski chalets, and private island villas with VIP status amenities.',
-        fr: 'Accès privilégié et partenariats d\'élite avec des hôtels de luxe de renommée mondiale, des chalets alpins privés et des villas insulaires.',
-        de: 'Privilegierter Zugang und Partnerschaften mit weltweit führenden Luxushotels, privaten Skichalets in den Alpen und exklusiven Inselvillen.',
-        ar: 'وصول متميز وشراكات نخبوية مع أرقى العلامات الفندقية العالمية والشاليهات الجبلية الخاصة والفلل في الجزر الخاصة مع مزايا كبار الشخصيات.',
+        en:
+            'Privileged access and elite partnerships with world-renowned luxury hotel brands, private alpine ski chalets, and private island villas with VIP status amenities.',
+        fr:
+            'Accès privilégié et partenariats d\'élite avec des hôtels de luxe de renommée mondiale, des chalets alpins privés et des villas insulaires.',
+        de:
+            'Privilegierter Zugang und Partnerschaften mit weltweit führenden Luxushotels, privaten Skichalets in den Alpen und exklusiven Inselvillen.',
+        ar:
+            'وصول متميز وشراكات نخبوية مع أرقى العلامات الفندقية العالمية والشاليهات الجبلية الخاصة والفلل في الجزر الخاصة مع مزايا كبار الشخصيات.',
       ),
       imageUrl: 'assets/hotelBooking.png',
       isActive: true,
@@ -128,7 +123,7 @@ class ConciergeService {
         ),
       ],
     ),
-    const ConciergeCategory(
+    ConciergeCategory(
       id: 'cat_chauffeur_services',
       slug: 'chauffeur-services',
       sortOrder: 2,
@@ -151,10 +146,14 @@ class ConciergeService {
         ar: 'خدمة السائق على مدرج المطار وتنقلات السيارات المصفحة',
       ),
       description: LocalizedText(
-        en: 'Direct aircraft-to-car airside pick-up in pristine luxury sedans, armored SUVs, and executive vans staffed by discreet, security-cleared multi-lingual chauffeurs.',
-        fr: 'Prise en charge directe au pied de l\'avion en berlines de luxe, SUV blindés et vans exécutifs avec chauffeurs discrets et polyglottes.',
-        de: 'Direkte Abholung vom Flugzeug am Rollfeld in Luxuslimousinen, gepanzerten SUVs und Executive Vans mit diskreten, geschulten Chauffeuren.',
-        ar: 'استقبال مباشر من باب الطائرة بسيارات سيدان فاخرة وسيارات دفع رباعي مصفحة وفانات تنفيذية مع سائقين محترفين متعددي اللغات.',
+        en:
+            'Direct aircraft-to-car airside pick-up in pristine luxury sedans, armored SUVs, and executive vans staffed by discreet, security-cleared multi-lingual chauffeurs.',
+        fr:
+            'Prise en charge directe au pied de l\'avion en berlines de luxe, SUV blindés et vans exécutifs avec chauffeurs discrets et polyglottes.',
+        de:
+            'Direkte Abholung vom Flugzeug am Rollfeld in Luxuslimousinen, gepanzerten SUVs und Executive Vans mit diskreten, geschulten Chauffeuren.',
+        ar:
+            'استقبال مباشر من باب الطائرة بسيارات سيدان فاخرة وسيارات دفع رباعي مصفحة وفانات تنفيذية مع سائقين محترفين متعددي اللغات.',
       ),
       imageUrl: 'assets/concierge2.png',
       isActive: true,
@@ -201,7 +200,7 @@ class ConciergeService {
         ),
       ],
     ),
-    const ConciergeCategory(
+    ConciergeCategory(
       id: 'cat_ground_handling',
       slug: 'ground-handling',
       sortOrder: 3,
@@ -224,10 +223,14 @@ class ConciergeService {
         ar: 'مساعدة كبار الشخصيات في صالات الطيران الخاص والمناولة الأرضية',
       ),
       description: LocalizedText(
-        en: 'Flawless execution of VIP ramp handling, accelerated customs & immigration protocol, private lounge management, jet refueling, and secure hangarage worldwide.',
-        fr: 'Exécution fluide de l\'assistance en piste VIP, dédouanement accéléré, salons privés, avitaillement et hangars sécurisés.',
-        de: 'Reibungslose VIP-Vorfeldabfertigung, beschleunigte Zoll- und Einreiseprotokolle, VIP-Lounges, Betankung und sichere Hangars weltweit.',
-        ar: 'تنفيذ احترافي للمناولة الأرضية، وإجراءات جمارك وجوازات سريعة، وصالات خاصة، وتزويد الطائرات بالوقود، ومواقف حظائر آمنة.',
+        en:
+            'Flawless execution of VIP ramp handling, accelerated customs & immigration protocol, private lounge management, jet refueling, and secure hangarage worldwide.',
+        fr:
+            'Exécution fluide de l\'assistance en piste VIP, dédouanement accéléré, salons privés, avitaillement et hangars sécurisés.',
+        de:
+            'Reibungslose VIP-Vorfeldabfertigung, beschleunigte Zoll- und Einreiseprotokolle, VIP-Lounges, Betankung und sichere Hangars weltweit.',
+        ar:
+            'تنفيذ احترافي للمناولة الأرضية، وإجراءات جمارك وجوازات سريعة، وصالات خاصة، وتزويد الطائرات بالوقود، ومواقف حظائر آمنة.',
       ),
       imageUrl: 'assets/concierge3.png',
       isActive: true,
@@ -274,7 +277,7 @@ class ConciergeService {
         ),
       ],
     ),
-    const ConciergeCategory(
+    ConciergeCategory(
       id: 'cat_diplomatic_support',
       slug: 'diplomatic-support',
       sortOrder: 4,
@@ -297,10 +300,14 @@ class ConciergeService {
         ar: 'بروتوكول السفارات ولوجستيات الوفود الرسمية والتصاريح الأمنية',
       ),
       description: LocalizedText(
-        en: 'Specialized protocol management for heads of state, royal families, foreign ministries, and government delegations requiring highest discretion and diplomatic immunity support.',
-        fr: 'Gestion spécialisée du protocole pour chefs d\'État, familles royales et délégations gouvernementales avec discrétion absolue.',
-        de: 'Spezialisiertes Protokollmanagement für Staatsoberhäupter, Königsfamilien und Delegationen mit höchster Diskretion.',
-        ar: 'إدارة متخصصة للبروتوكول لرؤساء الدول والأسر الحاكمة والوفود الحكومية مع أقصى درجات السرية والحصانة الدبلوماسية.',
+        en:
+            'Specialized protocol management for heads of state, royal families, foreign ministries, and government delegations requiring highest discretion and diplomatic immunity support.',
+        fr:
+            'Gestion spécialisée du protocole pour chefs d\'État, familles royales et délégations gouvernementales avec discrétion absolue.',
+        de:
+            'Spezialisiertes Protokollmanagement für Staatsoberhäupter, Königsfamilien und Delegationen mit höchster Diskretion.',
+        ar:
+            'إدارة متخصصة للبروتوكول لرؤساء الدول والأسر الحاكمة والوفود الحكومية مع أقصى درجات السرية والحصانة الدبلوماسية.',
       ),
       imageUrl: 'assets/concierge4.png',
       isActive: true,
@@ -347,7 +354,7 @@ class ConciergeService {
         ),
       ],
     ),
-    const ConciergeCategory(
+    ConciergeCategory(
       id: 'cat_vip_travel',
       slug: 'vip-travel-solutions',
       sortOrder: 5,
@@ -370,10 +377,14 @@ class ConciergeService {
         ar: 'تأجير اليخوت الفاخرة ورحلات الهليكوبتر والدخول الحصري للفعاليات',
       ),
       description: LocalizedText(
-        en: 'Ultra-exclusive luxury lifestyle orchestration including Mediterranean and Caribbean mega-yacht charters, alpine helicopter transfers, private island buyouts, and red-carpet event access.',
-        fr: 'Orchestration de style de vie ultra-exclusif incluant méga-yachts, hélicoptères alpins, îles privées et accès VIP aux galas.',
-        de: 'Exklusive Lifestyle-Orchestrierung inklusive Megayacht-Charter, Helikoptertransfers in den Alpen, Privatinseln und VIP-Eventzugang.',
-        ar: 'تنظيم تجارب معيشية فاخرة تشمل تأجير اليخوت الضخمة، وتنقلات الهليكوبتر الجبلية، وحجز الجزر الخاصة، وحضور الفعاليات العالمية الكبرى.',
+        en:
+            'Ultra-exclusive luxury lifestyle orchestration including Mediterranean and Caribbean mega-yacht charters, alpine helicopter transfers, private island buyouts, and red-carpet event access.',
+        fr:
+            'Orchestration de style de vie ultra-exclusif incluant méga-yachts, hélicoptères alpins, îles privées et accès VIP aux galas.',
+        de:
+            'Exklusive Lifestyle-Orchestrierung inklusive Megayacht-Charter, Helikoptertransfers in den Alpen, Privatinseln und VIP-Eventzugang.',
+        ar:
+            'تنظيم تجارب معيشية فاخرة تشمل تأجير اليخوت الضخمة، وتنقلات الهليكوبتر الجبلية، وحجز الجزر الخاصة، وحضور الفعاليات العالمية الكبرى.',
       ),
       imageUrl: 'assets/concierge5.png',
       isActive: true,
@@ -422,47 +433,269 @@ class ConciergeService {
     ),
   ];
 
+  ConciergeBanner _banner = defaultBanner;
+  List<ConciergeCategory> _categories = List.from(defaultCategories);
+
   final _bannerController = StreamController<ConciergeBanner>.broadcast();
-  final _categoriesController = StreamController<List<ConciergeCategory>>.broadcast();
+  final _categoriesController =
+      StreamController<List<ConciergeCategory>>.broadcast();
+
+  bool _isBannerSeeded = false;
+  bool _isCategoriesSeeded = false;
+
+  ConciergeService() {
+    _initBannerListener();
+    _initCategoriesListener();
+  }
+
+  void _initBannerListener() {
+    try {
+      _firestore.collection('concierge_banner').doc('main').snapshots().listen(
+        (doc) {
+          if (doc.exists && doc.data() != null) {
+            _banner = ConciergeBanner.fromMap(doc.data()!);
+            _bannerController.add(_banner);
+          } else if (!_isBannerSeeded) {
+            _isBannerSeeded = true;
+            seedInitialBanner();
+          }
+        },
+        onError: (e) {
+          dev.log(
+            'Firestore concierge banner listener error: $e',
+            name: 'ConciergeService',
+          );
+          _bannerController.add(_banner);
+        },
+      );
+    } catch (e) {
+      dev.log(
+        'Error initializing firestore concierge banner listener: $e',
+        name: 'ConciergeService',
+      );
+      _bannerController.add(_banner);
+    }
+  }
+
+  void _initCategoriesListener() {
+    try {
+      _firestore.collection('concierge_categories').snapshots().listen(
+        (snapshot) {
+          if (snapshot.docs.isNotEmpty) {
+            _categories.clear();
+            for (final doc in snapshot.docs) {
+              _categories.add(ConciergeCategory.fromMap(doc.data(), doc.id));
+            }
+            _notifyCategories();
+          } else if (!_isCategoriesSeeded) {
+            _isCategoriesSeeded = true;
+            seedInitialCategories();
+          }
+        },
+        onError: (e) {
+          dev.log(
+            'Firestore concierge categories listener error: $e',
+            name: 'ConciergeService',
+          );
+          _notifyCategories();
+        },
+      );
+    } catch (e) {
+      dev.log(
+        'Error initializing firestore concierge categories listener: $e',
+        name: 'ConciergeService',
+      );
+      _notifyCategories();
+    }
+  }
+
+  Future<void> seedInitialBanner({bool force = false}) async {
+    try {
+      final docRef = _firestore.collection('concierge_banner').doc('main');
+      if (!force) {
+        final existing = await docRef.get();
+        if (existing.exists && existing.data() != null) return;
+      }
+      final data = {
+        ...defaultBanner.toMap(),
+        'updatedAt': DateTime.now().toIso8601String(),
+      };
+      await docRef.set(data, SetOptions(merge: true));
+      dev.log(
+        'Initial concierge banner seeded successfully to Firestore',
+        name: 'ConciergeService',
+      );
+    } catch (e) {
+      dev.log(
+        'Error seeding initial concierge banner to Firestore: $e',
+        name: 'ConciergeService',
+      );
+      rethrow;
+    }
+  }
+
+  Future<void> seedInitialCategories({bool force = false}) async {
+    try {
+      if (!force) {
+        final existing =
+            await _firestore.collection('concierge_categories').limit(1).get();
+        if (existing.docs.isNotEmpty) return;
+      }
+      final batch = _firestore.batch();
+      final now = DateTime.now().toIso8601String();
+      for (final cat in defaultCategories) {
+        final docRef =
+            _firestore.collection('concierge_categories').doc(cat.id);
+        final data = {
+          ...cat.toMap(),
+          'createdAt': now,
+          'updatedAt': now,
+        };
+        batch.set(docRef, data, SetOptions(merge: true));
+      }
+      await batch.commit();
+      dev.log(
+        'Initial concierge categories seeded successfully to Firestore',
+        name: 'ConciergeService',
+      );
+    } catch (e) {
+      dev.log(
+        'Error seeding initial concierge categories to Firestore: $e',
+        name: 'ConciergeService',
+      );
+      rethrow;
+    }
+  }
+
+  Future<void> seedInitialData({bool force = false}) async {
+    await Future.wait([
+      seedInitialBanner(force: force),
+      seedInitialCategories(force: force),
+    ]);
+  }
+
+  void _sortCategories() {
+    _categories.sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+  }
+
+  void _notifyCategories() {
+    _sortCategories();
+    _categoriesController.add(List.unmodifiable(_categories));
+  }
+
+  void _recomputeSortOrders() {
+    for (int i = 0; i < _categories.length; i++) {
+      _categories[i] = _categories[i].copyWith(sortOrder: i + 1);
+    }
+  }
 
   Stream<ConciergeBanner> get bannerStream {
-    // Emit current state immediately
-    Timer.run(() => _bannerController.add(_banner));
-    return _bannerController.stream;
+    return Stream<ConciergeBanner>.multi((controller) {
+      controller.add(_banner);
+      final sub = _bannerController.stream.listen((data) {
+        controller.add(data);
+      });
+      controller.onCancel = () => sub.cancel();
+    });
   }
 
   Stream<List<ConciergeCategory>> get categoriesStream {
-    // Emit current state sorted by sortOrder
-    Timer.run(() {
-      final sorted = List<ConciergeCategory>.from(_categories)
-        ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
-      _categoriesController.add(sorted);
+    return Stream<List<ConciergeCategory>>.multi((controller) {
+      _sortCategories();
+      controller.add(List.unmodifiable(_categories));
+      final sub = _categoriesController.stream.listen((data) {
+        controller.add(data);
+      });
+      controller.onCancel = () => sub.cancel();
     });
-    return _categoriesController.stream;
   }
+
+  ConciergeBanner get currentBanner => _banner;
+  List<ConciergeCategory> get currentCategories =>
+      List.unmodifiable(_categories);
 
   // Banner Operations
   Future<ConciergeBanner> getBanner() async {
-    await Future.delayed(const Duration(milliseconds: 50));
+    try {
+      final doc =
+          await _firestore.collection('concierge_banner').doc('main').get();
+      if (doc.exists && doc.data() != null) {
+        _banner = ConciergeBanner.fromMap(doc.data()!);
+        return _banner;
+      }
+    } catch (e) {
+      dev.log(
+        'Error fetching concierge banner from Firestore: $e',
+        name: 'ConciergeService',
+      );
+    }
     return _banner;
   }
 
   Future<void> updateBanner(ConciergeBanner banner) async {
-    await Future.delayed(const Duration(milliseconds: 100));
     _banner = banner;
     _bannerController.add(_banner);
+
+    try {
+      final data = {
+        ...banner.toMap(),
+        'updatedAt': DateTime.now().toIso8601String(),
+      };
+      await _firestore
+          .collection('concierge_banner')
+          .doc('main')
+          .set(data, SetOptions(merge: true));
+    } catch (e) {
+      dev.log(
+        'Error saving concierge banner to Firestore: $e',
+        name: 'ConciergeService',
+      );
+      rethrow;
+    }
   }
 
   // Category Operations
   Future<List<ConciergeCategory>> listCategories() async {
-    await Future.delayed(const Duration(milliseconds: 50));
-    final sorted = List<ConciergeCategory>.from(_categories)
-      ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
-    return sorted;
+    try {
+      final snapshot =
+          await _firestore.collection('concierge_categories').get();
+      if (snapshot.docs.isNotEmpty) {
+        _categories.clear();
+        for (final doc in snapshot.docs) {
+          _categories.add(ConciergeCategory.fromMap(doc.data(), doc.id));
+        }
+      }
+    } catch (e) {
+      dev.log(
+        'Error listing concierge categories from Firestore: $e',
+        name: 'ConciergeService',
+      );
+    }
+    _sortCategories();
+    return List.unmodifiable(_categories);
   }
 
   Future<ConciergeCategory?> getCategory(String id) async {
-    await Future.delayed(const Duration(milliseconds: 50));
+    try {
+      final doc =
+          await _firestore.collection('concierge_categories').doc(id).get();
+      if (doc.exists && doc.data() != null) {
+        final cat = ConciergeCategory.fromMap(doc.data()!, doc.id);
+        final idx = _categories.indexWhere((c) => c.id == id);
+        if (idx >= 0) {
+          _categories[idx] = cat;
+        } else {
+          _categories.add(cat);
+        }
+        return cat;
+      }
+    } catch (e) {
+      dev.log(
+        'Error fetching concierge category $id from Firestore: $e',
+        name: 'ConciergeService',
+      );
+    }
+
     try {
       return _categories.firstWhere((c) => c.id == id);
     } catch (_) {
@@ -471,7 +704,6 @@ class ConciergeService {
   }
 
   Future<ConciergeCategory> createCategory(ConciergeCategory category) async {
-    await Future.delayed(const Duration(milliseconds: 100));
     final newId = category.id.isNotEmpty
         ? category.id
         : 'cat_${DateTime.now().millisecondsSinceEpoch}';
@@ -485,50 +717,128 @@ class ConciergeService {
     );
 
     _categories.add(created);
-    _notifyCategoriesChanged();
-    return created;
+    _notifyCategories();
+
+    final now = DateTime.now().toIso8601String();
+    final data = {
+      ...created.toMap(),
+      'createdAt': now,
+      'updatedAt': now,
+    };
+
+    try {
+      await _firestore
+          .collection('concierge_categories')
+          .doc(newId)
+          .set(data, SetOptions(merge: true));
+      return created;
+    } catch (e) {
+      dev.log(
+        'Error creating concierge category $newId in Firestore: $e',
+        name: 'ConciergeService',
+      );
+      rethrow;
+    }
   }
 
   Future<ConciergeCategory> updateCategory(ConciergeCategory category) async {
-    await Future.delayed(const Duration(milliseconds: 100));
     final index = _categories.indexWhere((c) => c.id == category.id);
     if (index >= 0) {
       _categories[index] = category;
-      _notifyCategoriesChanged();
-      return category;
     } else {
-      return createCategory(category);
+      _categories.add(category);
+    }
+    _notifyCategories();
+
+    final data = {
+      ...category.toMap(),
+      'updatedAt': DateTime.now().toIso8601String(),
+    };
+
+    try {
+      await _firestore
+          .collection('concierge_categories')
+          .doc(category.id)
+          .set(data, SetOptions(merge: true));
+      return category;
+    } catch (e) {
+      dev.log(
+        'Error updating concierge category ${category.id} in Firestore: $e',
+        name: 'ConciergeService',
+      );
+      rethrow;
     }
   }
 
   Future<void> deleteCategory(String id) async {
-    await Future.delayed(const Duration(milliseconds: 100));
     _categories.removeWhere((c) => c.id == id);
     _recomputeSortOrders();
-    _notifyCategoriesChanged();
+    _notifyCategories();
+
+    try {
+      await _firestore.collection('concierge_categories').doc(id).delete();
+    } catch (e) {
+      dev.log(
+        'Error deleting concierge category $id from Firestore: $e',
+        name: 'ConciergeService',
+      );
+      rethrow;
+    }
   }
 
   Future<void> reorderCategories(List<ConciergeCategory> reordered) async {
-    await Future.delayed(const Duration(milliseconds: 50));
+    final updatedList = <ConciergeCategory>[];
     for (int i = 0; i < reordered.length; i++) {
-      reordered[i] = reordered[i].copyWith(sortOrder: i + 1);
+      updatedList.add(reordered[i].copyWith(sortOrder: i + 1));
     }
-    _categories = List.from(reordered);
-    _notifyCategoriesChanged();
+    _categories = List.from(updatedList);
+    _notifyCategories();
+
+    try {
+      final batch = _firestore.batch();
+      final now = DateTime.now().toIso8601String();
+      for (final cat in updatedList) {
+        final docRef =
+            _firestore.collection('concierge_categories').doc(cat.id);
+        batch.update(docRef, {
+          'sortOrder': cat.sortOrder,
+          'updatedAt': now,
+        });
+      }
+      await batch.commit();
+    } catch (e) {
+      dev.log(
+        'Error reordering concierge categories in Firestore: $e',
+        name: 'ConciergeService',
+      );
+      rethrow;
+    }
   }
 
   Future<void> toggleCategoryStatus(String id, bool isActive) async {
-    await Future.delayed(const Duration(milliseconds: 50));
     final index = _categories.indexWhere((c) => c.id == id);
     if (index >= 0) {
       _categories[index] = _categories[index].copyWith(isActive: isActive);
-      _notifyCategoriesChanged();
+      _notifyCategories();
+    }
+
+    try {
+      await _firestore.collection('concierge_categories').doc(id).update({
+        'isActive': isActive,
+        'updatedAt': DateTime.now().toIso8601String(),
+      });
+    } catch (e) {
+      dev.log(
+        'Error toggling concierge category status for $id in Firestore: $e',
+        name: 'ConciergeService',
+      );
+      rethrow;
     }
   }
 
   // Feature Operations
-  Future<ConciergeFeature> addFeature(String categoryId, ConciergeFeature feature) async {
-    await Future.delayed(const Duration(milliseconds: 50));
+  Future<ConciergeFeature> addFeature(
+      String categoryId, ConciergeFeature feature) async {
     final catIndex = _categories.indexWhere((c) => c.id == categoryId);
     if (catIndex < 0) {
       throw Exception('Category $categoryId not found');
@@ -542,46 +852,97 @@ class ConciergeService {
         ? feature.sortOrder
         : category.features.length + 1;
 
-    final newFeature = feature.copyWith(id: featureId, sortOrder: featureOrder);
-    final updatedFeatures = List<ConciergeFeature>.from(category.features)..add(newFeature);
+    final newFeature =
+        feature.copyWith(id: featureId, sortOrder: featureOrder);
+    final updatedFeatures =
+        List<ConciergeFeature>.from(category.features)..add(newFeature);
 
     _categories[catIndex] = category.copyWith(features: updatedFeatures);
-    _notifyCategoriesChanged();
-    return newFeature;
+    _notifyCategories();
+
+    try {
+      await _firestore
+          .collection('concierge_categories')
+          .doc(categoryId)
+          .update({
+        'features': updatedFeatures.map((f) => f.toMap()).toList(),
+        'updatedAt': DateTime.now().toIso8601String(),
+      });
+      return newFeature;
+    } catch (e) {
+      dev.log(
+        'Error adding feature to concierge category $categoryId in Firestore: $e',
+        name: 'ConciergeService',
+      );
+      rethrow;
+    }
   }
 
-  Future<void> updateFeature(String categoryId, ConciergeFeature feature) async {
-    await Future.delayed(const Duration(milliseconds: 50));
+  Future<void> updateFeature(
+      String categoryId, ConciergeFeature feature) async {
     final catIndex = _categories.indexWhere((c) => c.id == categoryId);
     if (catIndex < 0) return;
 
     final category = _categories[catIndex];
     final fIndex = category.features.indexWhere((f) => f.id == feature.id);
-    if (fIndex >= 0) {
-      final updatedFeatures = List<ConciergeFeature>.from(category.features);
-      updatedFeatures[fIndex] = feature;
-      _categories[catIndex] = category.copyWith(features: updatedFeatures);
-      _notifyCategoriesChanged();
+    if (fIndex < 0) return;
+
+    final updatedFeatures = List<ConciergeFeature>.from(category.features);
+    updatedFeatures[fIndex] = feature;
+
+    _categories[catIndex] = category.copyWith(features: updatedFeatures);
+    _notifyCategories();
+
+    try {
+      await _firestore
+          .collection('concierge_categories')
+          .doc(categoryId)
+          .update({
+        'features': updatedFeatures.map((f) => f.toMap()).toList(),
+        'updatedAt': DateTime.now().toIso8601String(),
+      });
+    } catch (e) {
+      dev.log(
+        'Error updating feature ${feature.id} in concierge category $categoryId in Firestore: $e',
+        name: 'ConciergeService',
+      );
+      rethrow;
     }
   }
 
   Future<void> deleteFeature(String categoryId, String featureId) async {
-    await Future.delayed(const Duration(milliseconds: 50));
     final catIndex = _categories.indexWhere((c) => c.id == categoryId);
     if (catIndex < 0) return;
 
     final category = _categories[catIndex];
-    final updatedFeatures = category.features.where((f) => f.id != featureId).toList();
+    final updatedFeatures =
+        category.features.where((f) => f.id != featureId).toList();
     for (int i = 0; i < updatedFeatures.length; i++) {
       updatedFeatures[i] = updatedFeatures[i].copyWith(sortOrder: i + 1);
     }
 
     _categories[catIndex] = category.copyWith(features: updatedFeatures);
-    _notifyCategoriesChanged();
+    _notifyCategories();
+
+    try {
+      await _firestore
+          .collection('concierge_categories')
+          .doc(categoryId)
+          .update({
+        'features': updatedFeatures.map((f) => f.toMap()).toList(),
+        'updatedAt': DateTime.now().toIso8601String(),
+      });
+    } catch (e) {
+      dev.log(
+        'Error deleting feature $featureId from concierge category $categoryId in Firestore: $e',
+        name: 'ConciergeService',
+      );
+      rethrow;
+    }
   }
 
-  Future<void> reorderFeatures(String categoryId, List<ConciergeFeature> features) async {
-    await Future.delayed(const Duration(milliseconds: 50));
+  Future<void> reorderFeatures(
+      String categoryId, List<ConciergeFeature> features) async {
     final catIndex = _categories.indexWhere((c) => c.id == categoryId);
     if (catIndex < 0) return;
 
@@ -590,19 +951,25 @@ class ConciergeService {
       updatedFeatures.add(features[i].copyWith(sortOrder: i + 1));
     }
 
-    _categories[catIndex] = _categories[catIndex].copyWith(features: updatedFeatures);
-    _notifyCategoriesChanged();
-  }
+    _categories[catIndex] =
+        _categories[catIndex].copyWith(features: updatedFeatures);
+    _notifyCategories();
 
-  void _recomputeSortOrders() {
-    for (int i = 0; i < _categories.length; i++) {
-      _categories[i] = _categories[i].copyWith(sortOrder: i + 1);
+    try {
+      final batch = _firestore.batch();
+      final docRef =
+          _firestore.collection('concierge_categories').doc(categoryId);
+      batch.update(docRef, {
+        'features': updatedFeatures.map((f) => f.toMap()).toList(),
+        'updatedAt': DateTime.now().toIso8601String(),
+      });
+      await batch.commit();
+    } catch (e) {
+      dev.log(
+        'Error reordering features in concierge category $categoryId in Firestore: $e',
+        name: 'ConciergeService',
+      );
+      rethrow;
     }
-  }
-
-  void _notifyCategoriesChanged() {
-    final sorted = List<ConciergeCategory>.from(_categories)
-      ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
-    _categoriesController.add(sorted);
   }
 }

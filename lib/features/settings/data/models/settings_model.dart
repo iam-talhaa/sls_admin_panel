@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 class SettingsModel {
   final String recipientEmail;
   final String companyName;
@@ -17,6 +19,19 @@ class SettingsModel {
     this.updatedAt,
   });
 
+  static DateTime? _parseDateTime(dynamic val) {
+    if (val == null) return null;
+    if (val is DateTime) return val;
+    if (val is Timestamp) return val.toDate();
+    try {
+      return (val as dynamic).toDate();
+    } catch (_) {}
+    if (val is int) {
+      return DateTime.fromMillisecondsSinceEpoch(val);
+    }
+    return DateTime.tryParse(val.toString());
+  }
+
   factory SettingsModel.fromMap(Map<String, dynamic> data) {
     return SettingsModel(
       recipientEmail: data['recipientEmail']?.toString() ?? 'quote@swissluxuryservices.ch',
@@ -25,11 +40,7 @@ class SettingsModel {
       supportPhone: data['supportPhone']?.toString() ?? '+41 44 123 45 67',
       currency: data['currency']?.toString() ?? 'CHF',
       maintenanceMode: data['maintenanceMode'] == true,
-      updatedAt: data['updatedAt'] != null
-          ? (data['updatedAt'] is DateTime
-              ? data['updatedAt'] as DateTime
-              : DateTime.tryParse(data['updatedAt'].toString()))
-          : null,
+      updatedAt: _parseDateTime(data['updatedAt'] ?? data['updated_at'] ?? data['timestamp']),
     );
   }
 
@@ -41,7 +52,7 @@ class SettingsModel {
       'supportPhone': supportPhone,
       'currency': currency,
       'maintenanceMode': maintenanceMode,
-      'updatedAt': DateTime.now().toIso8601String(),
+      'updatedAt': FieldValue.serverTimestamp(),
     };
   }
 
@@ -65,3 +76,4 @@ class SettingsModel {
     );
   }
 }
+

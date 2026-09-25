@@ -224,7 +224,13 @@ class _ConciergeCategoryFormViewState extends ConsumerState<ConciergeCategoryFor
                   children: [
                     IconButton(
                       icon: Icon(Icons.arrow_back, color: colors.textPrimary),
-                      onPressed: () => context.go('/concierge'),
+                      onPressed: () {
+                        if (context.canPop()) {
+                          context.pop();
+                        } else {
+                          context.go('/concierge');
+                        }
+                      },
                     ),
                     const SizedBox(width: 8),
                     Column(
@@ -246,7 +252,13 @@ class _ConciergeCategoryFormViewState extends ConsumerState<ConciergeCategoryFor
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     OutlinedButton(
-                      onPressed: () => context.go('/concierge'),
+                      onPressed: () {
+                        if (context.canPop()) {
+                          context.pop();
+                        } else {
+                          context.go('/concierge');
+                        }
+                      },
                       style: OutlinedButton.styleFrom(
                         foregroundColor: colors.textSecondary,
                         side: BorderSide(color: colors.border),

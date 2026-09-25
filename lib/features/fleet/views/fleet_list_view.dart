@@ -24,24 +24,30 @@ class _FleetListViewState extends ConsumerState<FleetListView> {
     final colors = context.colors;
     final confirmed = await ConfirmDialog.show(
       context,
-      title: 'Delete Jet',
-      message: 'Are you sure you want to delete "${jet.name.en}"? This action cannot be undone.',
+      title: 'Delete Aircraft',
+      message: 'Are you sure you want to delete "${jet.name.en.isNotEmpty ? jet.name.en : 'this aircraft'}"? This action cannot be undone.',
       confirmLabel: 'Delete',
       isDestructive: true,
     );
 
-    if (confirmed && mounted) {
+    if (confirmed == true && mounted) {
       try {
         await ref.read(fleetRepositoryProvider).deleteJet(jet.id);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: const Text('Jet deleted successfully'), backgroundColor: colors.success),
+            SnackBar(
+              content: const Text('Aircraft deleted successfully from Firebase'),
+              backgroundColor: colors.success,
+            ),
           );
         }
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error deleting jet: $e'), backgroundColor: colors.error),
+            SnackBar(
+              content: Text('Error deleting aircraft: $e'),
+              backgroundColor: colors.error,
+            ),
           );
         }
       }
@@ -51,21 +57,24 @@ class _FleetListViewState extends ConsumerState<FleetListView> {
   Future<void> _duplicateJet(JetAdminModel jet) async {
     final colors = context.colors;
     try {
+      final newId = 'jet_${DateTime.now().millisecondsSinceEpoch}';
       final duplicate = jet.copyWith(
-        id: '',
+        id: newId,
         name: jet.name.copyWith(en: '${jet.name.en} (Copy)'),
         order: jet.order + 1,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
       );
       await ref.read(fleetRepositoryProvider).saveJet(duplicate);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: const Text('Jet duplicated successfully'), backgroundColor: colors.success),
+          SnackBar(content: const Text('Aircraft duplicated successfully in Firebase'), backgroundColor: colors.success),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error duplicating jet: $e'), backgroundColor: colors.error),
+          SnackBar(content: Text('Error duplicating aircraft: $e'), backgroundColor: colors.error),
         );
       }
     }
@@ -89,6 +98,25 @@ class _FleetListViewState extends ConsumerState<FleetListView> {
         );
       }
     }
+  }
+
+  Widget _buildThumbnail(String imageUrl, dynamic colors) {
+    if (imageUrl.isEmpty) {
+      return Icon(Icons.flight, color: colors.textSecondary, size: 18);
+    }
+    if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
+      return Image.network(
+        imageUrl,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => Icon(Icons.flight, color: colors.textSecondary, size: 18),
+      );
+    }
+    final assetPath = imageUrl.startsWith('assets/') ? imageUrl : 'assets/$imageUrl';
+    return Image.asset(
+      assetPath,
+      fit: BoxFit.cover,
+      errorBuilder: (_, __, ___) => Icon(Icons.flight, color: colors.textSecondary, size: 18),
+    );
   }
 
   @override
@@ -409,11 +437,7 @@ class _FleetListViewState extends ConsumerState<FleetListView> {
                                               border: Border.all(color: colors.border),
                                             ),
                                             clipBehavior: Clip.antiAlias,
-                                            child: jet.imageUrl.isNotEmpty
-                                                ? (jet.imageUrl.startsWith('http')
-                                                    ? Image.network(jet.imageUrl, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Icon(Icons.flight, color: colors.textSecondary, size: 18))
-                                                    : Image.asset(jet.imageUrl, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Icon(Icons.flight, color: colors.textSecondary, size: 18)))
-                                                : Icon(Icons.flight, color: colors.textSecondary, size: 18),
+                                            child: _buildThumbnail(jet.imageUrl, colors),
                                           ),
                                           const SizedBox(width: 20),
 

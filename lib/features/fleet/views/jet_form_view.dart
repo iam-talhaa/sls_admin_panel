@@ -176,7 +176,13 @@ class _JetFormViewState extends ConsumerState<JetFormView> {
                   children: [
                     IconButton(
                       icon: Icon(Icons.arrow_back, color: colors.textPrimary),
-                      onPressed: () => context.go('/fleet'),
+                      onPressed: () {
+                        if (context.canPop()) {
+                          context.pop();
+                        } else {
+                          context.go('/fleet');
+                        }
+                      },
                     ),
                     const SizedBox(width: 8),
                     Column(
@@ -192,7 +198,13 @@ class _JetFormViewState extends ConsumerState<JetFormView> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     OutlinedButton(
-                      onPressed: () => context.go('/fleet'),
+                      onPressed: () {
+                        if (context.canPop()) {
+                          context.pop();
+                        } else {
+                          context.go('/fleet');
+                        }
+                      },
                       style: OutlinedButton.styleFrom(
                         foregroundColor: colors.textSecondary,
                         side: BorderSide(color: colors.border),

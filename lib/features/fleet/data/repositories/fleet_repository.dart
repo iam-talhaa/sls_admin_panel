@@ -155,7 +155,6 @@ class FleetRepository {
     try {
       _firestore
           .collection('jets')
-          .orderBy('order')
           .snapshots()
           .listen(
             (snapshot) {
@@ -194,9 +193,7 @@ class FleetRepository {
       final batch = _firestore.batch();
       for (final jet in _inMemoryJets) {
         final docRef = _firestore.collection('jets').doc(jet.id);
-        // Exclude imageUrl — Firebase Storage is not yet enabled.
-        final data = Map<String, dynamic>.from(jet.toMap())..remove('imageUrl');
-        batch.set(docRef, data, SetOptions(merge: true));
+        batch.set(docRef, jet.toMap(), SetOptions(merge: true));
       }
       await batch.commit();
       dev.log(
@@ -208,7 +205,7 @@ class FleetRepository {
         'Error seeding initial jets to Firestore: $e',
         name: 'FleetRepository',
       );
-      rethrow; // propagate so the UI can show the error snackbar
+      rethrow;
     }
   }
 
@@ -293,7 +290,6 @@ class FleetRepository {
         'Error saving jet $newId to Firestore: $e',
         name: 'FleetRepository',
       );
-      // Do not rethrow — in-memory update already succeeded.
     }
   }
 
@@ -308,7 +304,6 @@ class FleetRepository {
         'Error deleting jet $id from Firestore: $e',
         name: 'FleetRepository',
       );
-      // Do not rethrow — in-memory deletion already succeeded.
     }
   }
 
@@ -332,7 +327,7 @@ class FleetRepository {
         'Error toggling jet status in Firestore: $e',
         name: 'FleetRepository',
       );
-      // Do not rethrow — in-memory update already succeeded.
+      rethrow;
     }
   }
 
@@ -358,7 +353,7 @@ class FleetRepository {
         'Error updating jets order in Firestore: $e',
         name: 'FleetRepository',
       );
-      // Do not rethrow — in-memory reorder already succeeded.
+      rethrow;
     }
   }
 }

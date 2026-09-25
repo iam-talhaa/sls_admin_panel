@@ -15,6 +15,7 @@ import '../../features/destinations/views/destinations_list_view.dart';
 import '../../features/fleet/views/fleet_list_view.dart';
 import '../../features/fleet/views/jet_form_view.dart';
 import '../../features/home_content/views/home_content_view.dart';
+import '../../features/legal/views/privacy_policy_view.dart';
 import '../../features/quote_requests/views/quote_request_detail_view.dart';
 import '../../features/quote_requests/views/quote_requests_list_view.dart';
 import '../../features/settings/views/settings_view.dart';
@@ -23,26 +24,25 @@ import '../../features/users/views/users_list_view.dart';
 import '../providers/current_admin_provider.dart';
 import '../widgets/admin_scaffold.dart';
 
-// Stable key for the shell navigator — provides a proper Overlay
-// to all pages inside ShellRoute, fixing "No Overlay widget found"
-// errors on TextField tap (Flutter Web + go_router known issue).
+final _rootNavigatorKey = GlobalKey<NavigatorState>();
 final _shellNavigatorKey = GlobalKey<NavigatorState>();
 
 final appRouterProvider = Provider<GoRouter>((ref) {
-  final currentAdminAsync = ref.watch(currentAdminProvider);
-
   return GoRouter(
+    navigatorKey: _rootNavigatorKey,
     initialLocation: '/dashboard',
     refreshListenable: _RiverpodRefreshStream(ref),
     redirect: (context, state) {
+      final currentAdminAsync = ref.read(currentAdminProvider);
       final isLoading = currentAdminAsync.isLoading;
       if (isLoading) return null;
 
       final adminUser = currentAdminAsync.asData?.value;
       final isLoggingIn = state.matchedLocation == '/login';
+      final isPrivacyPolicy = state.matchedLocation == '/privacy-policy' || state.matchedLocation == '/privacy';
 
       if (adminUser == null) {
-        return isLoggingIn ? null : '/login';
+        return (isLoggingIn || isPrivacyPolicy) ? null : '/login';
       }
 
       if (isLoggingIn) {
@@ -60,7 +60,15 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     routes: [
       GoRoute(
         path: '/login',
-        pageBuilder: (context, state) => const NoTransitionPage(child: LoginView()),
+        pageBuilder: (context, state) => NoTransitionPage(key: state.pageKey, child: const LoginView()),
+      ),
+      GoRoute(
+        path: '/privacy-policy',
+        pageBuilder: (context, state) => NoTransitionPage(key: state.pageKey, child: const PrivacyPolicyView()),
+      ),
+      GoRoute(
+        path: '/privacy',
+        pageBuilder: (context, state) => NoTransitionPage(key: state.pageKey, child: const PrivacyPolicyView()),
       ),
       ShellRoute(
         navigatorKey: _shellNavigatorKey,
@@ -73,22 +81,22 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         routes: [
           GoRoute(
             path: '/dashboard',
-            pageBuilder: (context, state) => const NoTransitionPage(child: DashboardView()),
+            pageBuilder: (context, state) => NoTransitionPage(key: state.pageKey, child: const DashboardView()),
           ),
           // Fleet
           GoRoute(
             path: '/fleet',
-            pageBuilder: (context, state) => const NoTransitionPage(child: FleetListView()),
+            pageBuilder: (context, state) => NoTransitionPage(key: state.pageKey, child: const FleetListView()),
             routes: [
               GoRoute(
                 path: 'new',
-                pageBuilder: (context, state) => const NoTransitionPage(child: JetFormView(jetId: 'new')),
+                pageBuilder: (context, state) => NoTransitionPage(key: state.pageKey, child: const JetFormView(jetId: 'new')),
               ),
               GoRoute(
                 path: ':id',
                 pageBuilder: (context, state) {
                   final id = state.pathParameters['id'] ?? '';
-                  return NoTransitionPage(child: JetFormView(jetId: id));
+                  return NoTransitionPage(key: state.pageKey, child: JetFormView(jetId: id));
                 },
               ),
             ],
@@ -96,17 +104,17 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           // Destinations
           GoRoute(
             path: '/destinations',
-            pageBuilder: (context, state) => const NoTransitionPage(child: DestinationsListView()),
+            pageBuilder: (context, state) => NoTransitionPage(key: state.pageKey, child: const DestinationsListView()),
             routes: [
               GoRoute(
                 path: 'new',
-                pageBuilder: (context, state) => const NoTransitionPage(child: DestinationFormView(destinationId: 'new')),
+                pageBuilder: (context, state) => NoTransitionPage(key: state.pageKey, child: const DestinationFormView(destinationId: 'new')),
               ),
               GoRoute(
                 path: ':id',
                 pageBuilder: (context, state) {
                   final id = state.pathParameters['id'] ?? '';
-                  return NoTransitionPage(child: DestinationFormView(destinationId: id));
+                  return NoTransitionPage(key: state.pageKey, child: DestinationFormView(destinationId: id));
                 },
               ),
             ],
@@ -114,17 +122,17 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           // Blog
           GoRoute(
             path: '/blog',
-            pageBuilder: (context, state) => const NoTransitionPage(child: BlogListView()),
+            pageBuilder: (context, state) => NoTransitionPage(key: state.pageKey, child: const BlogListView()),
             routes: [
               GoRoute(
                 path: 'new',
-                pageBuilder: (context, state) => const NoTransitionPage(child: BlogFormView(blogId: 'new')),
+                pageBuilder: (context, state) => NoTransitionPage(key: state.pageKey, child: const BlogFormView(blogId: 'new')),
               ),
               GoRoute(
                 path: ':id',
                 pageBuilder: (context, state) {
                   final id = state.pathParameters['id'] ?? '';
-                  return NoTransitionPage(child: BlogFormView(blogId: id));
+                  return NoTransitionPage(key: state.pageKey, child: BlogFormView(blogId: id));
                 },
               ),
             ],
@@ -132,13 +140,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           // Quote Requests
           GoRoute(
             path: '/quote-requests',
-            pageBuilder: (context, state) => const NoTransitionPage(child: QuoteRequestsListView()),
+            pageBuilder: (context, state) => NoTransitionPage(key: state.pageKey, child: const QuoteRequestsListView()),
             routes: [
               GoRoute(
                 path: ':id',
                 pageBuilder: (context, state) {
                   final id = state.pathParameters['id'] ?? '';
-                  return NoTransitionPage(child: QuoteRequestDetailView(requestId: id));
+                  return NoTransitionPage(key: state.pageKey, child: QuoteRequestDetailView(requestId: id));
                 },
               ),
             ],
@@ -146,13 +154,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           // Concierge Requests
           GoRoute(
             path: '/concierge-requests',
-            pageBuilder: (context, state) => const NoTransitionPage(child: ConciergeRequestsListView()),
+            pageBuilder: (context, state) => NoTransitionPage(key: state.pageKey, child: const ConciergeRequestsListView()),
             routes: [
               GoRoute(
                 path: ':id',
                 pageBuilder: (context, state) {
                   final id = state.pathParameters['id'] ?? '';
-                  return NoTransitionPage(child: ConciergeRequestDetailView(requestId: id));
+                  return NoTransitionPage(key: state.pageKey, child: ConciergeRequestDetailView(requestId: id));
                 },
               ),
             ],
@@ -160,13 +168,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           // Users
           GoRoute(
             path: '/users',
-            pageBuilder: (context, state) => const NoTransitionPage(child: UsersListView()),
+            pageBuilder: (context, state) => NoTransitionPage(key: state.pageKey, child: const UsersListView()),
             routes: [
               GoRoute(
                 path: ':id',
                 pageBuilder: (context, state) {
                   final id = state.pathParameters['id'] ?? '';
-                  return NoTransitionPage(child: UserDetailView(userId: id));
+                  return NoTransitionPage(key: state.pageKey, child: UserDetailView(userId: id));
                 },
               ),
             ],
@@ -174,22 +182,22 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           // Home Content
           GoRoute(
             path: '/home-content',
-            pageBuilder: (context, state) => const NoTransitionPage(child: HomeContentView()),
+            pageBuilder: (context, state) => NoTransitionPage(key: state.pageKey, child: const HomeContentView()),
           ),
           // Concierge Services
           GoRoute(
             path: '/concierge',
-            pageBuilder: (context, state) => const NoTransitionPage(child: ConciergeView()),
+            pageBuilder: (context, state) => NoTransitionPage(key: state.pageKey, child: const ConciergeView()),
             routes: [
               GoRoute(
                 path: 'new',
-                pageBuilder: (context, state) => const NoTransitionPage(child: ConciergeCategoryFormView(categoryId: 'new')),
+                pageBuilder: (context, state) => NoTransitionPage(key: state.pageKey, child: const ConciergeCategoryFormView(categoryId: 'new')),
               ),
               GoRoute(
                 path: ':id',
                 pageBuilder: (context, state) {
                   final id = state.pathParameters['id'] ?? '';
-                  return NoTransitionPage(child: ConciergeCategoryFormView(categoryId: id));
+                  return NoTransitionPage(key: state.pageKey, child: ConciergeCategoryFormView(categoryId: id));
                 },
               ),
             ],
@@ -197,12 +205,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           // Admins
           GoRoute(
             path: '/admins',
-            pageBuilder: (context, state) => const NoTransitionPage(child: AdminsView()),
+            pageBuilder: (context, state) => NoTransitionPage(key: state.pageKey, child: const AdminsView()),
           ),
           // Settings
           GoRoute(
             path: '/settings',
-            pageBuilder: (context, state) => const NoTransitionPage(child: SettingsView()),
+            pageBuilder: (context, state) => NoTransitionPage(key: state.pageKey, child: const SettingsView()),
           ),
         ],
       ),

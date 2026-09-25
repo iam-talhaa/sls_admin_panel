@@ -461,7 +461,7 @@ class DestinationsRepository {
 
   void _initFirestoreListener() {
     try {
-      _firestore.collection('destinations').orderBy('order').snapshots().listen(
+      _firestore.collection('destinations').snapshots().listen(
         (snapshot) {
           if (snapshot.docs.isNotEmpty) {
             _destinations.clear();
@@ -469,13 +469,9 @@ class DestinationsRepository {
               _destinations.add(DestinationAdminModel.fromMap(doc.data(), doc.id));
             }
             _notify();
-            if (snapshot.docs.length < defaultDestinations.length && !_isSeeded) {
-              _isSeeded = true;
-              seedInitialDestinations(force: true);
-            }
           } else if (!_isSeeded) {
             _isSeeded = true;
-            seedInitialDestinations(force: true);
+            seedInitialDestinations();
           }
         },
         onError: (e) {
@@ -505,6 +501,10 @@ class DestinationsRepository {
       dev.log('Initial destinations seeded successfully to Firestore (${defaultDestinations.length} destinations)', name: 'DestinationsRepository');
     } catch (e) {
       dev.log('Error seeding initial destinations to Firestore: $e', name: 'DestinationsRepository');
+      if (_destinations.isEmpty) {
+        _destinations.addAll(defaultDestinations);
+        _notify();
+      }
       rethrow;
     }
   }
@@ -552,9 +552,13 @@ class DestinationsRepository {
   }
 
   Future<void> saveDestination(DestinationAdminModel destination) async {
-    final newId = destination.id.isNotEmpty ? destination.id : 'dest_${DateTime.now().millisecondsSinceEpoch}';
+    final newId = destination.id.isNotEmpty
+        ? destination.id
+        : 'dest_${DateTime.now().millisecondsSinceEpoch}';
     final index = _destinations.indexWhere((d) => d.id == newId || (destination.id.isNotEmpty && d.id == destination.id));
-    final finalOrder = destination.order > 0 ? destination.order : (index >= 0 ? _destinations[index].order : _destinations.length);
+    final finalOrder = destination.order > 0
+        ? destination.order
+        : (index >= 0 ? _destinations[index].order : _destinations.length);
     final finalDest = destination.copyWith(
       id: newId,
       order: finalOrder,
@@ -573,7 +577,7 @@ class DestinationsRepository {
       await _firestore.collection('destinations').doc(newId).set(finalDest.toMap(), SetOptions(merge: true));
     } catch (e) {
       dev.log('Error saving destination $newId to Firestore: $e', name: 'DestinationsRepository');
-      // Do not rethrow — in-memory update already succeeded.
+      rethrow;
     }
   }
 
@@ -585,7 +589,7 @@ class DestinationsRepository {
       await _firestore.collection('destinations').doc(id).delete();
     } catch (e) {
       dev.log('Error deleting destination $id from Firestore: $e', name: 'DestinationsRepository');
-      // Do not rethrow — in-memory deletion already succeeded.
+      rethrow;
     }
   }
 
@@ -603,7 +607,7 @@ class DestinationsRepository {
       });
     } catch (e) {
       dev.log('Error toggling destination status in Firestore: $e', name: 'DestinationsRepository');
-      // Do not rethrow — in-memory update already succeeded.
+      rethrow;
     }
   }
 

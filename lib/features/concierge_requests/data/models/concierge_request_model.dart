@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 enum ConciergeRequestStatus {
   isNew('new', 'New'),
   inProgress('in_progress', 'In Progress'),
@@ -8,8 +10,13 @@ enum ConciergeRequestStatus {
   const ConciergeRequestStatus(this.value, this.label);
 
   static ConciergeRequestStatus fromString(String? status) {
-    if (status == 'in_progress') return ConciergeRequestStatus.inProgress;
-    if (status == 'resolved') return ConciergeRequestStatus.resolved;
+    final s = status?.toLowerCase().trim();
+    if (s == 'in_progress' || s == 'inprogress' || s == 'contacted' || s == 'processing' || s == 'in progress') {
+      return ConciergeRequestStatus.inProgress;
+    }
+    if (s == 'resolved' || s == 'closed' || s == 'completed' || s == 'confirmed') {
+      return ConciergeRequestStatus.resolved;
+    }
     return ConciergeRequestStatus.isNew;
   }
 }
@@ -23,6 +30,10 @@ class ConciergeRequestModel {
   final ConciergeRequestStatus status;
   final String adminNotes;
   final DateTime? createdAt;
+  final DateTime? updatedAt;
+  final String? serviceCategory;
+  final String? preferredDate;
+  final String? userId;
 
   const ConciergeRequestModel({
     required this.id,
@@ -33,22 +44,68 @@ class ConciergeRequestModel {
     this.status = ConciergeRequestStatus.isNew,
     this.adminNotes = '',
     this.createdAt,
+    this.updatedAt,
+    this.serviceCategory,
+    this.preferredDate,
+    this.userId,
   });
 
+  static DateTime? _parseDateTime(dynamic val) {
+    if (val == null) return null;
+    if (val is DateTime) return val;
+    if (val is Timestamp) return val.toDate();
+    try {
+      return (val as dynamic).toDate();
+    } catch (_) {}
+    if (val is int) {
+      return DateTime.fromMillisecondsSinceEpoch(val);
+    }
+    return DateTime.tryParse(val.toString());
+  }
+
   factory ConciergeRequestModel.fromMap(Map<String, dynamic> data, [String id = '']) {
+    final name = data['name']?.toString() ??
+        data['clientName']?.toString() ??
+        data['fullName']?.toString() ??
+        data['guestName']?.toString() ??
+        data['firstName']?.toString() ??
+        '';
+
+    final email = data['email']?.toString() ??
+        data['userEmail']?.toString() ??
+        data['contactEmail']?.toString() ??
+        '';
+
+    final phone = data['phone']?.toString() ??
+        data['phoneNumber']?.toString() ??
+        data['telephone']?.toString() ??
+        '';
+
+    final details = data['requestDetails']?.toString() ??
+        data['message']?.toString() ??
+        data['details']?.toString() ??
+        data['notes']?.toString() ??
+        data['requirements']?.toString() ??
+        '';
+
+    final adminNotes = data['adminNotes']?.toString() ??
+        data['internalNotes']?.toString() ??
+        data['adminComment']?.toString() ??
+        '';
+
     return ConciergeRequestModel(
       id: id.isNotEmpty ? id : (data['id']?.toString() ?? ''),
-      name: data['name']?.toString() ?? '',
-      email: data['email']?.toString() ?? '',
-      phone: data['phone']?.toString() ?? '',
-      requestDetails: data['requestDetails']?.toString() ?? '',
+      name: name,
+      email: email,
+      phone: phone,
+      requestDetails: details,
       status: ConciergeRequestStatus.fromString(data['status']?.toString()),
-      adminNotes: data['adminNotes']?.toString() ?? '',
-      createdAt: data['createdAt'] != null
-          ? (data['createdAt'] is DateTime
-              ? data['createdAt'] as DateTime
-              : DateTime.tryParse(data['createdAt'].toString()))
-          : null,
+      adminNotes: adminNotes,
+      createdAt: _parseDateTime(data['createdAt'] ?? data['timestamp'] ?? data['submittedAt'] ?? data['date']),
+      updatedAt: _parseDateTime(data['updatedAt']),
+      serviceCategory: data['serviceCategory']?.toString() ?? data['category']?.toString() ?? data['categoryTitle']?.toString() ?? data['service']?.toString(),
+      preferredDate: data['preferredDate']?.toString() ?? data['date']?.toString() ?? data['requestedDate']?.toString(),
+      userId: data['userId']?.toString() ?? data['uid']?.toString(),
     );
   }
 
@@ -61,7 +118,11 @@ class ConciergeRequestModel {
       'requestDetails': requestDetails,
       'status': status.value,
       'adminNotes': adminNotes,
-      'createdAt': (createdAt ?? DateTime.now()).toIso8601String(),
+      if (serviceCategory != null && serviceCategory!.isNotEmpty) 'serviceCategory': serviceCategory,
+      if (preferredDate != null && preferredDate!.isNotEmpty) 'preferredDate': preferredDate,
+      if (userId != null && userId!.isNotEmpty) 'userId': userId,
+      'createdAt': createdAt != null ? Timestamp.fromDate(createdAt!) : FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
     };
   }
 
@@ -74,6 +135,10 @@ class ConciergeRequestModel {
     ConciergeRequestStatus? status,
     String? adminNotes,
     DateTime? createdAt,
+    DateTime? updatedAt,
+    String? serviceCategory,
+    String? preferredDate,
+    String? userId,
   }) {
     return ConciergeRequestModel(
       id: id ?? this.id,
@@ -84,6 +149,10 @@ class ConciergeRequestModel {
       status: status ?? this.status,
       adminNotes: adminNotes ?? this.adminNotes,
       createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      serviceCategory: serviceCategory ?? this.serviceCategory,
+      preferredDate: preferredDate ?? this.preferredDate,
+      userId: userId ?? this.userId,
     );
   }
 }

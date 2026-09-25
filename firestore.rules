@@ -1,86 +1,65 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Helper function to check if caller is an administrator in the `admins` collection or has admin claim
-    function isAdmin() {
-      return request.auth != null && (
-        request.auth.token.role == 'admin' ||
-        request.auth.token.role == 'super_admin' ||
-        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
-        true // Allow authenticated admin panel users
-      );
-    }
-    
-    function isSuperAdmin() {
-      return request.auth != null && (
-        request.auth.token.role == 'super_admin' ||
-        (exists(/databases/$(database)/documents/admins/$(request.auth.uid)) && get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.role == 'super_admin') ||
-        true
-      );
-    }
-
-    // Admins Collection
-    // Super admins can read and write; editors can only read
-    match /admins/{adminId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null;
-    }
-
-    // Settings Collection
-    match /settings/{docId} {
-      allow read: if true;
-      allow write: if request.auth != null;
-    }
 
     // Fleet Jets Collection
     match /jets/{jetId} {
-      allow read: if true;
-      allow write: if request.auth != null;
+      allow read, write: if true;
     }
 
     // Destinations Collection
     match /destinations/{destId} {
-      allow read: if true;
-      allow write: if request.auth != null;
+      allow read, write: if true;
     }
 
     // Blogs Collection
     match /blogs/{blogId} {
-      allow read: if true;
-      allow write: if request.auth != null;
+      allow read, write: if true;
+    }
+
+    // Concierge Banner Document
+    match /concierge_banner/{id} {
+      allow read, write: if true;
+    }
+
+    // Concierge Categories Collection
+    match /concierge_categories/{id} {
+      allow read, write: if true;
+    }
+
+    // Quote Requests Collection
+    match /quote_requests/{requestId} {
+      allow read, write: if true;
+    }
+
+    // Concierge Requests Collection
+    match /concierge_requests/{requestId} {
+      allow read, write: if true;
+    }
+
+    // Mobile App Users Collection
+    match /users/{userId} {
+      allow read, write: if true;
+    }
+
+    // Admins Collection
+    match /admins/{adminId} {
+      allow read, write: if true;
+    }
+
+    // Settings Collection
+    match /settings/{docId} {
+      allow read, write: if true;
     }
 
     // Home Content Collection
     match /home_content/{docId} {
-      allow read: if true;
-      allow write: if request.auth != null;
+      allow read, write: if true;
     }
 
-    // Quote Requests Collection
-    // Mobile users can create quote requests; only admins can list, update, and delete
-    match /quote_requests/{requestId} {
-      allow create: if true;
-      allow read, update, delete: if isAdmin();
-    }
-
-    // Concierge Requests Collection
-    // Mobile users can submit concierge requests; only admins can manage
-    match /concierge_requests/{requestId} {
-      allow create: if true;
-      allow read, update, delete: if isAdmin();
-    }
-
-    // Mobile App Users collection (profile mirrors)
-    match /users/{userId} {
-      allow read: if request.auth != null && (request.auth.uid == userId || isAdmin());
-      allow write: if request.auth != null && (request.auth.uid == userId || isAdmin());
-    }
-
-    // Mail collection (Trigger Email extension)
+    // Mail Collection
     match /mail/{mailId} {
-      allow create: if true;
-      allow read, update, delete: if isAdmin();
+      allow read, write: if true;
     }
   }
 }

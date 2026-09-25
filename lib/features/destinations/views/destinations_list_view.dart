@@ -51,15 +51,18 @@ class _DestinationsListViewState extends ConsumerState<DestinationsListView> {
   Future<void> _duplicateDestination(DestinationAdminModel dest) async {
     final colors = context.colors;
     try {
+      final newId = 'dest_${DateTime.now().millisecondsSinceEpoch}';
       final duplicate = dest.copyWith(
-        id: '',
+        id: newId,
         title: dest.title.copyWith(en: '${dest.title.en} (Copy)'),
         order: dest.order + 1,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
       );
       await ref.read(destinationsRepositoryProvider).saveDestination(duplicate);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: const Text('Destination duplicated successfully'), backgroundColor: colors.success),
+          SnackBar(content: const Text('Destination duplicated successfully in Firebase'), backgroundColor: colors.success),
         );
       }
     } catch (e) {

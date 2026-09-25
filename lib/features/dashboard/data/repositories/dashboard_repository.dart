@@ -1,10 +1,16 @@
+import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../blog/data/models/blog_admin_model.dart';
 import '../../../blog/data/repositories/blog_repository.dart';
+import '../../../concierge_requests/data/models/concierge_request_model.dart';
 import '../../../concierge_requests/data/repositories/concierge_requests_repository.dart';
+import '../../../destinations/data/models/destination_admin_model.dart';
 import '../../../destinations/data/repositories/destinations_repository.dart';
+import '../../../fleet/data/models/jet_admin_model.dart';
 import '../../../fleet/data/repositories/fleet_repository.dart';
 import '../../../quote_requests/data/models/quote_request_model.dart';
 import '../../../quote_requests/data/repositories/quote_requests_repository.dart';
+import '../../../users/data/models/user_admin_model.dart';
 import '../../../users/data/repositories/users_repository.dart';
 
 class DashboardStats {
@@ -44,8 +50,39 @@ final dashboardRepositoryProvider = Provider<DashboardRepository>((ref) {
   );
 });
 
-final dashboardStatsProvider = FutureProvider<DashboardStats>((ref) async {
-  return ref.watch(dashboardRepositoryProvider).fetchDashboardStats();
+final dashboardStatsProvider = Provider<AsyncValue<DashboardStats>>((ref) {
+  final fleetRepo = ref.watch(fleetRepositoryProvider);
+  final destsRepo = ref.watch(destinationsRepositoryProvider);
+  final blogRepo = ref.watch(blogRepositoryProvider);
+  final quotesRepo = ref.watch(quoteRequestsRepositoryProvider);
+  final conciergeRepo = ref.watch(conciergeRequestsRepositoryProvider);
+  final usersRepo = ref.watch(usersRepositoryProvider);
+
+  // Watch real-time stream providers across the application
+  final jetsAsync = ref.watch(fleetListStreamProvider);
+  final destsAsync = ref.watch(destinationsListStreamProvider);
+  final blogsAsync = ref.watch(blogListStreamProvider);
+  final quotesAsync = ref.watch(quoteRequestsListStreamProvider);
+  final conciergeAsync = ref.watch(conciergeRequestsListStreamProvider);
+  final usersAsync = ref.watch(usersListStreamProvider);
+
+  final jets = jetsAsync.valueOrNull ?? fleetRepo.currentJets;
+  final dests = destsAsync.valueOrNull ?? destsRepo.currentDestinations;
+  final blogs = blogsAsync.valueOrNull ?? blogRepo.currentBlogs;
+  final quotes = quotesAsync.valueOrNull ?? quotesRepo.currentQuotes;
+  final concierge = conciergeAsync.valueOrNull ?? conciergeRepo.currentRequests;
+  final users = usersAsync.valueOrNull ?? usersRepo.currentUsers;
+
+  final stats = ref.watch(dashboardRepositoryProvider).computeStats(
+    jets: jets,
+    dests: dests,
+    blogs: blogs,
+    quotes: quotes,
+    concierge: concierge,
+    users: users,
+  );
+
+  return AsyncData(stats);
 });
 
 class DashboardRepository {
@@ -65,32 +102,38 @@ class DashboardRepository {
     this._usersRepo,
   );
 
-  Future<DashboardStats> fetchDashboardStats() async {
-    final jets = _fleetRepo.currentJets;
-    final dests = _destsRepo.currentDestinations;
-    final blogs = _blogRepo.currentBlogs;
-    final quotes = _quotesRepo.currentQuotes;
-    final concierge = _conciergeRepo.currentRequests;
-    final users = await _usersRepo.listUsers();
-
+  DashboardStats computeStats({
+    required List<JetAdminModel> jets,
+    required List<DestinationAdminModel> dests,
+    required List<BlogAdminModel> blogs,
+    required List<QuoteRequestModel> quotes,
+    required List<ConciergeRequestModel> concierge,
+    required List<UserAdminModel> users,
+  }) {
     final statusMap = <String, int>{'new': 0, 'contacted': 0, 'closed': 0};
     final dailyQuotesMap = <DateTime, int>{};
     final recentQuotes = <QuoteRequestModel>[];
 
     final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
     final sevenDaysAgo = now.subtract(const Duration(days: 7));
     final thirtyDaysAgo = now.subtract(const Duration(days: 30));
 
     // Initialize 30 days slots
     for (int i = 29; i >= 0; i--) {
-      final day = DateTime(now.year, now.month, now.day).subtract(Duration(days: i));
+      final day = today.subtract(Duration(days: i));
       dailyQuotesMap[day] = 0;
     }
 
     int newQuotes7Days = 0;
 
-    for (int i = 0; i < quotes.length; i++) {
-      final quote = quotes[i];
+    // Sort quotes descending by createdAt
+    final sortedQuotes = List<QuoteRequestModel>.from(quotes)
+      ..sort((a, b) => (b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0))
+          .compareTo(a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0)));
+
+    for (int i = 0; i < sortedQuotes.length; i++) {
+      final quote = sortedQuotes[i];
 
       if (i < 5) {
         recentQuotes.add(quote);
@@ -114,6 +157,8 @@ class DashboardRepository {
             dailyQuotesMap[quoteDay] = (dailyQuotesMap[quoteDay] ?? 0) + 1;
           }
         }
+      } else if (quote.status == QuoteRequestStatus.isNew) {
+        newQuotes7Days++;
       }
     }
 
@@ -130,4 +175,23 @@ class DashboardRepository {
       recentQuoteRequests: recentQuotes,
     );
   }
+
+  Future<DashboardStats> fetchDashboardStats() async {
+    final jets = _fleetRepo.currentJets;
+    final dests = _destsRepo.currentDestinations;
+    final blogs = _blogRepo.currentBlogs;
+    final quotes = _quotesRepo.currentQuotes;
+    final concierge = _conciergeRepo.currentRequests;
+    final users = await _usersRepo.listUsers();
+
+    return computeStats(
+      jets: jets,
+      dests: dests,
+      blogs: blogs,
+      quotes: quotes,
+      concierge: concierge,
+      users: users,
+    );
+  }
 }
+

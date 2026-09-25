@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/theme/app_color_scheme.dart';
 import '../../../core/constants/app_text_styles.dart';
+import '../../../core/widgets/confirm_dialog.dart';
 import '../../../core/widgets/status_badge.dart';
 import '../data/models/concierge_request_model.dart';
 import '../data/repositories/concierge_requests_repository.dart';
@@ -81,7 +82,7 @@ class _ConciergeRequestDetailViewState extends ConsumerState<ConciergeRequestDet
       });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: const Text('Admin notes saved!'), backgroundColor: colors.success),
+          SnackBar(content: const Text('Admin notes saved to Firebase!'), backgroundColor: colors.success),
         );
       }
     } catch (e) {
@@ -90,6 +91,28 @@ class _ConciergeRequestDetailViewState extends ConsumerState<ConciergeRequestDet
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error saving notes: $e'), backgroundColor: colors.error),
         );
+      }
+    }
+  }
+
+  Future<void> _deleteRequest() async {
+    if (_request == null) return;
+    final colors = context.colors;
+    final confirmed = await ConfirmDialog.show(
+      context,
+      title: 'Delete Concierge Request',
+      message: 'Are you sure you want to permanently delete this concierge request from ${_request!.name}?',
+      confirmLabel: 'Delete',
+      isDestructive: true,
+    );
+
+    if (confirmed && mounted) {
+      await ref.read(conciergeRequestsRepositoryProvider).deleteConciergeRequest(_request!.id);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: const Text('Concierge request deleted from Firebase'), backgroundColor: colors.success),
+        );
+        context.go('/concierge-requests');
       }
     }
   }
@@ -122,6 +145,7 @@ class _ConciergeRequestDetailViewState extends ConsumerState<ConciergeRequestDet
     if (_request == null) {
       return Center(
         child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Text('Concierge request not found.', style: AppTextStyles.headingSmall.copyWith(color: colors.textPrimary)),
             const SizedBox(height: 12),
@@ -134,44 +158,73 @@ class _ConciergeRequestDetailViewState extends ConsumerState<ConciergeRequestDet
       );
     }
 
+    final hasServiceMeta = (_request!.serviceCategory != null && _request!.serviceCategory!.isNotEmpty) ||
+        (_request!.preferredDate != null && _request!.preferredDate!.isNotEmpty);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         // Header
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        Wrap(
+          alignment: WrapAlignment.spaceBetween,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 12,
+          runSpacing: 12,
           children: [
             Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
                 IconButton(
                   icon: Icon(Icons.arrow_back, color: colors.textPrimary),
-                  onPressed: () => context.go('/concierge-requests'),
+                  onPressed: () {
+                    if (context.canPop()) {
+                      context.pop();
+                    } else {
+                      context.go('/concierge-requests');
+                    }
+                  },
+                  tooltip: 'Back to List',
                 ),
                 const SizedBox(width: 8),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('Concierge Request Details', style: AppTextStyles.headingMedium.copyWith(color: colors.textPrimary)),
-                    Text('ID: ${_request!.id}', style: AppTextStyles.subtitle.copyWith(color: colors.textSecondary)),
+                    Text('Document ID: ${_request!.id}', style: AppTextStyles.subtitle.copyWith(color: colors.textSecondary)),
                   ],
                 ),
               ],
             ),
             Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
                 StatusBadge.fromStatus(_request!.status.value),
                 const SizedBox(width: 12),
-                DropdownButton<ConciergeRequestStatus>(
-                  value: _request!.status,
-                  dropdownColor: colors.surfaceElevated,
-                  style: AppTextStyles.bodyMedium.copyWith(color: colors.textPrimary),
-                  underline: const SizedBox(),
-                  items: ConciergeRequestStatus.values.map((s) {
-                    return DropdownMenuItem(value: s, child: Text(s.label));
-                  }).toList(),
-                  onChanged: (val) {
-                    if (val != null) _updateStatus(val);
-                  },
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: colors.surfaceElevated,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: colors.border),
+                  ),
+                  child: DropdownButton<ConciergeRequestStatus>(
+                    value: _request!.status,
+                    dropdownColor: colors.surfaceElevated,
+                    style: AppTextStyles.bodyMedium.copyWith(color: colors.textPrimary),
+                    underline: const SizedBox(),
+                    items: ConciergeRequestStatus.values.map((s) {
+                      return DropdownMenuItem(value: s, child: Text(s.label));
+                    }).toList(),
+                    onChanged: (val) {
+                      if (val != null) _updateStatus(val);
+                    },
+                  ),
+                ),
+                const SizedBox(width: 12),
+                IconButton(
+                  icon: Icon(Icons.delete_outline, color: colors.error),
+                  onPressed: _deleteRequest,
+                  tooltip: 'Delete Request',
                 ),
               ],
             ),
@@ -207,7 +260,7 @@ class _ConciergeRequestDetailViewState extends ConsumerState<ConciergeRequestDet
                   Divider(height: 24, color: colors.border),
                   _buildInfoRow(
                     'Email Address',
-                    _request!.email,
+                    _request!.email.isNotEmpty ? _request!.email : 'Not provided',
                     colors,
                     trailing: _request!.email.isNotEmpty
                         ? IconButton(
@@ -238,6 +291,10 @@ class _ConciergeRequestDetailViewState extends ConsumerState<ConciergeRequestDet
                         : 'Unknown',
                     colors,
                   ),
+                  if (_request!.userId != null && _request!.userId!.isNotEmpty) ...[
+                    Divider(height: 24, color: colors.border),
+                    _buildInfoRow('User ID', _request!.userId!, colors),
+                  ],
                 ],
               ),
             );
@@ -261,6 +318,29 @@ class _ConciergeRequestDetailViewState extends ConsumerState<ConciergeRequestDet
                 children: [
                   Text('Concierge Service Requirements', style: AppTextStyles.headingSmall.copyWith(color: colors.textPrimary)),
                   const SizedBox(height: 16),
+
+                  if (hasServiceMeta) ...[
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      margin: const EdgeInsets.only(bottom: 16),
+                      decoration: BoxDecoration(
+                        color: colors.surfaceElevatedHigher,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: colors.border),
+                      ),
+                      child: Wrap(
+                        spacing: 16,
+                        runSpacing: 8,
+                        children: [
+                          if (_request!.serviceCategory != null && _request!.serviceCategory!.isNotEmpty)
+                            _buildBadgeInfo('Service Type', _request!.serviceCategory!, colors),
+                          if (_request!.preferredDate != null && _request!.preferredDate!.isNotEmpty)
+                            _buildBadgeInfo('Preferred Date', _request!.preferredDate!, colors),
+                        ],
+                      ),
+                    ),
+                  ],
+
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(16),
@@ -279,7 +359,7 @@ class _ConciergeRequestDetailViewState extends ConsumerState<ConciergeRequestDet
                   // Admin Notes
                   Text('Internal Concierge Notes', style: AppTextStyles.headingSmall.copyWith(color: colors.textPrimary)),
                   const SizedBox(height: 8),
-                  Text('Private notes for concierge coordinators.', style: AppTextStyles.subtitle.copyWith(color: colors.textSecondary)),
+                  Text('Private notes for concierge coordinators (persisted in Firestore).', style: AppTextStyles.subtitle.copyWith(color: colors.textSecondary)),
                   const SizedBox(height: 12),
                   TextField(
                     controller: _notesController,
@@ -299,8 +379,8 @@ class _ConciergeRequestDetailViewState extends ConsumerState<ConciergeRequestDet
                           : const Icon(Icons.save, size: 16),
                       label: Text(_isSavingNotes ? 'Saving...' : 'Save Notes'),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: colors.surfaceElevatedHigher,
-                        foregroundColor: colors.textPrimary,
+                        backgroundColor: colors.primaryRed,
+                        foregroundColor: Colors.white,
                       ),
                     ),
                   ),
@@ -329,6 +409,24 @@ class _ConciergeRequestDetailViewState extends ConsumerState<ConciergeRequestDet
           },
         ),
       ],
+    );
+  }
+
+  Widget _buildBadgeInfo(String label, String val, dynamic colors) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: colors.surfaceElevated,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: colors.border),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text('$label: ', style: AppTextStyles.bodySmall.copyWith(color: colors.textSecondary, fontSize: 11)),
+          Text(val, style: AppTextStyles.bodySmall.copyWith(color: colors.textPrimary, fontWeight: FontWeight.bold, fontSize: 11)),
+        ],
+      ),
     );
   }
 

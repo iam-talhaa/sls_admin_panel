@@ -3,6 +3,7 @@ import '../../../../core/models/localized_text.dart';
 
 class BlogAdminModel {
   final String id;
+  final int order;
   final LocalizedText title;
   final LocalizedText excerpt;
   final String imageUrl;
@@ -14,6 +15,7 @@ class BlogAdminModel {
 
   const BlogAdminModel({
     required this.id,
+    this.order = 0,
     required this.title,
     required this.excerpt,
     required this.imageUrl,
@@ -43,6 +45,7 @@ class BlogAdminModel {
 
     return BlogAdminModel(
       id: id.isNotEmpty ? id : (data['id']?.toString() ?? ''),
+      order: data['order'] is num ? (data['order'] as num).toInt() : int.tryParse(data['order']?.toString() ?? '') ?? 0,
       title: LocalizedText.fromMap(data['title']),
       excerpt: LocalizedText.fromMap(data['excerpt']),
       imageUrl: data['imageUrl']?.toString() ?? '',
@@ -57,6 +60,7 @@ class BlogAdminModel {
   Map<String, dynamic> toMap() {
     return {
       'id': id,
+      'order': order,
       'title': title.toMap(),
       'excerpt': excerpt.toMap(),
       'imageUrl': imageUrl,
@@ -70,6 +74,7 @@ class BlogAdminModel {
 
   BlogAdminModel copyWith({
     String? id,
+    int? order,
     LocalizedText? title,
     LocalizedText? excerpt,
     String? imageUrl,
@@ -81,6 +86,7 @@ class BlogAdminModel {
   }) {
     return BlogAdminModel(
       id: id ?? this.id,
+      order: order ?? this.order,
       title: title ?? this.title,
       excerpt: excerpt ?? this.excerpt,
       imageUrl: imageUrl ?? this.imageUrl,
