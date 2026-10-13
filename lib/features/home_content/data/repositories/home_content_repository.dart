@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:developer' as dev;
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/models/localized_text.dart';
 import '../models/home_content_model.dart';
@@ -12,6 +14,8 @@ final homeContentStreamProvider = StreamProvider<HomeContentAdminModel>((ref) {
 });
 
 class HomeContentRepository {
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
   HomeContentAdminModel _homeContent = const HomeContentAdminModel(
     routeCards: [
       RouteCardAdminModel(
@@ -48,9 +52,52 @@ class HomeContentRepository {
   );
 
   final _streamController = StreamController<HomeContentAdminModel>.broadcast();
+  StreamSubscription<DocumentSnapshot>? _subscription;
 
   HomeContentRepository() {
     _streamController.add(_homeContent);
+    _initFirestore();
+  }
+
+  void _initFirestore() {
+    try {
+      _subscription = _firestore
+          .collection('home_content')
+          .doc('main')
+          .snapshots()
+          .listen(
+        (doc) {
+          if (doc.exists && doc.data() != null) {
+            try {
+              _homeContent = HomeContentAdminModel.fromMap(doc.data()!);
+              _streamController.add(_homeContent);
+            } catch (e) {
+              dev.log('Error parsing home_content from Firestore: $e', name: 'HomeContentRepository');
+            }
+          } else {
+            // First time setup - seed default home content into Firestore
+            _seedDefaultHomeContent();
+          }
+        },
+        onError: (err) {
+          dev.log('Error listening to home_content in Firestore: $err', name: 'HomeContentRepository');
+        },
+      );
+    } catch (e) {
+      dev.log('Firestore initialization error in HomeContentRepository: $e', name: 'HomeContentRepository');
+    }
+  }
+
+  Future<void> _seedDefaultHomeContent() async {
+    try {
+      await _firestore
+          .collection('home_content')
+          .doc('main')
+          .set(_homeContent.toMap(), SetOptions(merge: true));
+      dev.log('Default home_content seeded to Firestore', name: 'HomeContentRepository');
+    } catch (e) {
+      dev.log('Could not seed home_content to Firestore: $e', name: 'HomeContentRepository');
+    }
   }
 
   Stream<HomeContentAdminModel> watchHomeContent() {
@@ -64,11 +111,36 @@ class HomeContentRepository {
   }
 
   Future<HomeContentAdminModel> getHomeContent() async {
+    try {
+      final doc = await _firestore.collection('home_content').doc('main').get();
+      if (doc.exists && doc.data() != null) {
+        _homeContent = HomeContentAdminModel.fromMap(doc.data()!);
+        return _homeContent;
+      }
+    } catch (e) {
+      dev.log('Error fetching home_content from Firestore: $e', name: 'HomeContentRepository');
+    }
     return _homeContent;
   }
 
   Future<void> saveHomeContent(HomeContentAdminModel model) async {
     _homeContent = model;
     _streamController.add(_homeContent);
+
+    try {
+      await _firestore
+          .collection('home_content')
+          .doc('main')
+          .set(model.toMap(), SetOptions(merge: true));
+      dev.log('Successfully saved home_content to Firestore', name: 'HomeContentRepository');
+    } catch (e) {
+      dev.log('Error saving home_content to Firestore: $e', name: 'HomeContentRepository');
+      rethrow;
+    }
+  }
+
+  void dispose() {
+    _subscription?.cancel();
+    _streamController.close();
   }
 }

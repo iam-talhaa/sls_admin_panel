@@ -104,16 +104,17 @@ class _DestinationFormViewState extends ConsumerState<DestinationFormView> {
   }
 
   Future<void> _handleSave() async {
+    final messenger = ScaffoldMessenger.of(context);
     final colors = context.colors;
     if (!_formKey.currentState!.validate()) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         SnackBar(content: const Text('Please complete all required fields.'), backgroundColor: colors.error),
       );
       return;
     }
 
     if (_title.en.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         SnackBar(content: const Text('Please enter a destination title in English.'), backgroundColor: colors.error),
       );
       return;
@@ -146,7 +147,7 @@ class _DestinationFormViewState extends ConsumerState<DestinationFormView> {
       await ref.read(destinationsRepositoryProvider).saveDestination(destination);
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        messenger.showSnackBar(
           SnackBar(
             content: Text(isNew ? 'Destination created successfully!' : 'Destination updated successfully!'),
             backgroundColor: colors.success,
@@ -156,15 +157,12 @@ class _DestinationFormViewState extends ConsumerState<DestinationFormView> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error saving destination: $e'), backgroundColor: colors.error),
-        );
-      }
-    } finally {
-      if (mounted) {
         setState(() {
           _isSaving = false;
         });
+        messenger.showSnackBar(
+          SnackBar(content: Text('Error saving destination: $e'), backgroundColor: colors.error),
+        );
       }
     }
   }
@@ -326,7 +324,7 @@ class _DestinationFormViewState extends ConsumerState<DestinationFormView> {
                             label: 'Cover / Hero Image',
                             initialImageUrl: _imageUrl,
                             storagePath: 'destinations/${isNew ? 'temp_${DateTime.now().millisecondsSinceEpoch}' : _id}',
-                            onImageUploaded: (url) => _imageUrl = url,
+                            onImageUploaded: (url) => setState(() => _imageUrl = url),
                           ),
                           const SizedBox(height: 20),
 

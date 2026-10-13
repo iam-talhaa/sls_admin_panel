@@ -131,16 +131,17 @@ class _BlogFormViewState extends ConsumerState<BlogFormView> {
   }
 
   Future<void> _handleSave() async {
+    final messenger = ScaffoldMessenger.of(context);
     final colors = context.colors;
     if (!_formKey.currentState!.validate()) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         SnackBar(content: const Text('Please complete all required fields.'), backgroundColor: colors.error),
       );
       return;
     }
 
     if (_title.en.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         SnackBar(content: const Text('Please enter an article title in English.'), backgroundColor: colors.error),
       );
       return;
@@ -165,7 +166,7 @@ class _BlogFormViewState extends ConsumerState<BlogFormView> {
       await ref.read(blogRepositoryProvider).saveBlog(blog);
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        messenger.showSnackBar(
           SnackBar(
             content: Text(isNew ? 'Blog post published successfully!' : 'Blog post updated successfully!'),
             backgroundColor: colors.success,
@@ -175,15 +176,12 @@ class _BlogFormViewState extends ConsumerState<BlogFormView> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error saving blog: $e'), backgroundColor: colors.error),
-        );
-      }
-    } finally {
-      if (mounted) {
         setState(() {
           _isSaving = false;
         });
+        messenger.showSnackBar(
+          SnackBar(content: Text('Error saving blog: $e'), backgroundColor: colors.error),
+        );
       }
     }
   }
@@ -313,7 +311,7 @@ class _BlogFormViewState extends ConsumerState<BlogFormView> {
                     label: 'Featured Cover Image',
                     initialImageUrl: _imageUrl,
                     storagePath: 'blogs/${isNew ? 'temp_${DateTime.now().millisecondsSinceEpoch}' : _id}',
-                    onImageUploaded: (url) => _imageUrl = url,
+                    onImageUploaded: (url) => setState(() => _imageUrl = url),
                   ),
                 ],
               ),

@@ -10,6 +10,7 @@ import '../../../core/widgets/image_uploader.dart';
 import '../../../core/widgets/loading_overlay.dart';
 import '../../../core/widgets/localized_field_tabs.dart';
 import '../../../core/widgets/status_badge.dart';
+import '../../../core/widgets/safe_image.dart';
 import '../data/models/concierge_model.dart';
 import '../data/services/concierge_service.dart';
 import 'widgets/concierge_mobile_preview.dart';
@@ -27,10 +28,18 @@ class _ConciergeViewState extends ConsumerState<ConciergeView> {
 
   // Local state for banner editing
   bool _isBannerExpanded = true;
-  LocalizedText _bannerTitle = LocalizedText.empty;
-  LocalizedText _bannerSubtitle = LocalizedText.empty;
-  String _bannerImageUrl = '';
+  LocalizedText _bannerTitle = ConciergeService.defaultBanner.title;
+  LocalizedText _bannerSubtitle = ConciergeService.defaultBanner.subtitle;
+  String _bannerImageUrl = ConciergeService.defaultBanner.imageUrl;
   bool _bannerInitialized = false;
+
+  final ScrollController _categoriesScrollController = ScrollController();
+
+  @override
+  void dispose() {
+    _categoriesScrollController.dispose();
+    super.dispose();
+  }
 
   void _initBannerState(ConciergeBanner banner) {
     if (!_bannerInitialized) {
@@ -141,11 +150,10 @@ class _ConciergeViewState extends ConsumerState<ConciergeView> {
     }
   }
 
-  Future<void> _onReorderCategories(List<ConciergeCategory> currentList, int oldIndex, int newIndex) async {
+  Future<void> _moveCategory(List<ConciergeCategory> currentList, int oldIndex, int newIndex) async {
+    if (newIndex < 0 || newIndex >= currentList.length) return;
+    FocusScope.of(context).unfocus();
     final colors = context.colors;
-    if (newIndex > oldIndex) {
-      newIndex -= 1;
-    }
     final items = List<ConciergeCategory>.from(currentList);
     final movedItem = items.removeAt(oldIndex);
     items.insert(newIndex, movedItem);
@@ -360,12 +368,14 @@ class _ConciergeViewState extends ConsumerState<ConciergeView> {
 
                   if (isWide) {
                     return Row(
+                      key: const ValueKey('banner_row_wide'),
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         // Left: Banner Image
                         SizedBox(
                           width: 320,
                           child: ImageUploader(
+                            key: const ValueKey('banner_uploader_wide'),
                             label: 'Hero Banner Image',
                             initialImageUrl: _bannerImageUrl,
                             height: 180,
@@ -380,9 +390,11 @@ class _ConciergeViewState extends ConsumerState<ConciergeView> {
                         // Right: Title & Subtitle localized inputs
                         Expanded(
                           child: Column(
+                            key: const ValueKey('banner_col_wide'),
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               LocalizedFieldTabs(
+                                key: const ValueKey('banner_title_wide'),
                                 label: 'Hero Banner Title',
                                 initialValue: _bannerTitle,
                                 isRequired: true,
@@ -391,6 +403,7 @@ class _ConciergeViewState extends ConsumerState<ConciergeView> {
                               ),
                               const SizedBox(height: 16),
                               LocalizedFieldTabs(
+                                key: const ValueKey('banner_subtitle_wide'),
                                 label: 'Hero Banner Subtitle',
                                 initialValue: _bannerSubtitle,
                                 maxLines: 3,
@@ -404,9 +417,11 @@ class _ConciergeViewState extends ConsumerState<ConciergeView> {
                     );
                   } else {
                     return Column(
+                      key: const ValueKey('banner_col_narrow'),
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         ImageUploader(
+                          key: const ValueKey('banner_uploader_narrow'),
                           label: 'Hero Banner Image',
                           initialImageUrl: _bannerImageUrl,
                           height: 180,
@@ -418,6 +433,7 @@ class _ConciergeViewState extends ConsumerState<ConciergeView> {
                         ),
                         const SizedBox(height: 16),
                         LocalizedFieldTabs(
+                          key: const ValueKey('banner_title_narrow'),
                           label: 'Hero Banner Title',
                           initialValue: _bannerTitle,
                           isRequired: true,
@@ -426,6 +442,7 @@ class _ConciergeViewState extends ConsumerState<ConciergeView> {
                         ),
                         const SizedBox(height: 16),
                         LocalizedFieldTabs(
+                          key: const ValueKey('banner_subtitle_narrow'),
                           label: 'Hero Banner Subtitle',
                           initialValue: _bannerSubtitle,
                           maxLines: 3,
@@ -576,7 +593,13 @@ class _ConciergeViewState extends ConsumerState<ConciergeView> {
                           ),
                           child: Row(
                             children: [
-                              const SizedBox(width: 36),
+                              SizedBox(
+                                width: 44,
+                                child: Center(
+                                  child: Text('ORDER', style: TextStyle(color: colors.textSecondary, fontSize: 11, fontWeight: FontWeight.w600)),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
                               SizedBox(
                                 width: 75,
                                 child: Text('IMAGE', style: TextStyle(color: colors.textSecondary, fontSize: 12, fontWeight: FontWeight.w600)),
@@ -609,18 +632,12 @@ class _ConciergeViewState extends ConsumerState<ConciergeView> {
                         ),
                         Divider(height: 1, color: colors.border),
 
-                        // Reorderable Category Rows
-                        ReorderableListView.builder(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          itemCount: filtered.length,
-                          onReorder: (oldIdx, newIdx) => _onReorderCategories(filtered, oldIdx, newIdx),
-                          buildDefaultDragHandles: false,
-                          itemBuilder: (context, index) {
+                        // Category Rows
+                        Column(
+                          children: List.generate(filtered.length, (index) {
                             final cat = filtered[index];
 
                             return Container(
-                              key: ValueKey(cat.id.isNotEmpty ? cat.id : 'cat_$index'),
                               decoration: BoxDecoration(
                                 border: Border(bottom: BorderSide(color: colors.border)),
                               ),
@@ -633,17 +650,38 @@ class _ConciergeViewState extends ConsumerState<ConciergeView> {
                                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                                     child: Row(
                                       children: [
-                                        // Drag Handle
-                                        ReorderableDragStartListener(
-                                          index: index,
-                                          child: MouseRegion(
-                                            cursor: SystemMouseCursors.grab,
-                                            child: Padding(
-                                              padding: const EdgeInsets.only(right: 12.0),
-                                              child: Icon(Icons.drag_indicator, color: colors.textSecondary, size: 20),
-                                            ),
+                                        // Reorder Controls (Move Up / Down)
+                                        SizedBox(
+                                          width: 44,
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              IconButton(
+                                                icon: const Icon(Icons.arrow_upward, size: 15),
+                                                padding: EdgeInsets.zero,
+                                                constraints: const BoxConstraints(minWidth: 20, minHeight: 24),
+                                                color: colors.textSecondary,
+                                                disabledColor: colors.border.withOpacity(0.3),
+                                                tooltip: 'Move Up',
+                                                onPressed: index > 0
+                                                    ? () => _moveCategory(filtered, index, index - 1)
+                                                    : null,
+                                              ),
+                                              IconButton(
+                                                icon: const Icon(Icons.arrow_downward, size: 15),
+                                                padding: EdgeInsets.zero,
+                                                constraints: const BoxConstraints(minWidth: 20, minHeight: 24),
+                                                color: colors.textSecondary,
+                                                disabledColor: colors.border.withOpacity(0.3),
+                                                tooltip: 'Move Down',
+                                                onPressed: index < filtered.length - 1
+                                                    ? () => _moveCategory(filtered, index, index + 1)
+                                                    : null,
+                                              ),
+                                            ],
                                           ),
                                         ),
+                                        const SizedBox(width: 8),
 
                                         // Image Preview
                                         Container(
@@ -655,19 +693,11 @@ class _ConciergeViewState extends ConsumerState<ConciergeView> {
                                             border: Border.all(color: colors.border),
                                           ),
                                           clipBehavior: Clip.antiAlias,
-                                          child: cat.imageUrl.isNotEmpty
-                                              ? (cat.imageUrl.startsWith('http')
-                                                  ? Image.network(
-                                                      cat.imageUrl,
-                                                      fit: BoxFit.cover,
-                                                      errorBuilder: (_, __, ___) => Icon(Icons.room_service, color: colors.textSecondary, size: 18),
-                                                    )
-                                                  : Image.asset(
-                                                      cat.imageUrl,
-                                                      fit: BoxFit.cover,
-                                                      errorBuilder: (_, __, ___) => Icon(Icons.room_service, color: colors.textSecondary, size: 18),
-                                                    ))
-                                              : Icon(Icons.room_service, color: colors.textSecondary, size: 18),
+                                          child: SafeImage(
+                                            imageUrl: cat.imageUrl,
+                                            fit: BoxFit.cover,
+                                            placeholder: Icon(Icons.room_service, color: colors.textSecondary, size: 18),
+                                          ),
                                         ),
                                         const SizedBox(width: 16),
 
@@ -811,7 +841,7 @@ class _ConciergeViewState extends ConsumerState<ConciergeView> {
                                 ),
                               ),
                             );
-                          },
+                          }),
                         ),
                       ],
                     ),

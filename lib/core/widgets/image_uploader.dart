@@ -1,10 +1,13 @@
-import 'dart:convert';
+import 'dart:developer' as dev;
 import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../services/storage_service.dart';
 import '../theme/app_color_scheme.dart';
 import '../constants/app_text_styles.dart';
+import '../constants/firebase_asset_urls.dart';
+import 'safe_image.dart';
 
 class ImageUploader extends ConsumerStatefulWidget {
   final String label;
@@ -41,32 +44,27 @@ class _ImageUploaderState extends ConsumerState<ImageUploader> {
   @override
   void initState() {
     super.initState();
-    _currentUrl = widget.initialImageUrl;
+    final initial = widget.initialImageUrl;
+    _currentUrl = (initial != null && initial.isNotEmpty)
+        ? FirebaseAssetUrls.getUrl(initial)
+        : initial;
   }
 
   @override
   void didUpdateWidget(covariant ImageUploader oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.initialImageUrl != oldWidget.initialImageUrl) {
-      _currentUrl = widget.initialImageUrl;
+      final initial = widget.initialImageUrl;
+      final resolved = (initial != null && initial.isNotEmpty)
+          ? FirebaseAssetUrls.getUrl(initial)
+          : initial;
+      _currentUrl = resolved;
+      if (resolved != null && resolved.isNotEmpty) {
+        _previewBytes = null;
+      }
     }
   }
 
-  String _getFallbackPlaceholder() {
-    final path = widget.storagePath.toLowerCase();
-    if (path.contains('fleet') || path.contains('jet')) {
-      return 'assets/jet1.png';
-    } else if (path.contains('blog')) {
-      return 'assets/blog3.png';
-    } else if (path.contains('dest')) {
-      return 'assets/des1.jpg';
-    } else if (path.contains('concierge')) {
-      return 'assets/hotelBooking.png';
-    } else if (path.contains('home')) {
-      return 'assets/des1.jpg';
-    }
-    return 'assets/slslogo.png';
-  }
 
   List<String> _getPresetsForCategory() {
     final path = widget.storagePath.toLowerCase();
@@ -90,7 +88,7 @@ class _ImageUploaderState extends ConsumerState<ImageUploader> {
     try {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
-        allowedExtensions: ['jpg', 'jpeg', 'png', 'webp'],
+        allowedExtensions: ['jpg', 'jpeg', 'png', 'webp', 'gif'],
         withData: true,
       );
 
@@ -99,29 +97,129 @@ class _ImageUploaderState extends ConsumerState<ImageUploader> {
       final file = result.files.first;
       final bytes = file.bytes;
 
-      if (bytes == null) {
+      if (bytes == null || bytes.isEmpty) {
         setState(() {
-          _errorMessage = 'Could not read file data';
+          _errorMessage = 'Could not read file data. Please select another file.';
         });
         return;
       }
 
-      // Show the user's picked image in live preview, and assign a safe asset placeholder for storage
-      final placeholder = _getFallbackPlaceholder();
-
+      // Show immediate local preview and enter uploading state
       setState(() {
         _previewBytes = bytes;
-        _currentUrl = placeholder;
-        _isUploading = false;
+        _isUploading = true;
+        _errorMessage = null;
       });
 
-      widget.onImageUploaded(placeholder);
+      // Upload directly to Firebase Storage
+      final folder = widget.storagePath.isNotEmpty ? widget.storagePath : 'uploads';
+      final downloadUrl = await ref.read(storageServiceProvider).uploadImageBytes(
+        bytes: bytes,
+        path: folder,
+        fileName: file.name,
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        _currentUrl = downloadUrl;
+        _isUploading = false;
+        _errorMessage = null;
+      });
+
+      widget.onImageUploaded(downloadUrl);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Row(
+            children: [
+              Icon(Icons.cloud_done, color: Colors.white, size: 20),
+              SizedBox(width: 10),
+              Text('Image successfully uploaded to Firebase Storage!'),
+            ],
+          ),
+          backgroundColor: Color(0xFF22C55E),
+          duration: Duration(seconds: 3),
+        ),
+      );
     } catch (e) {
+      dev.log('Firebase Storage upload error: $e', name: 'ImageUploader');
+      if (!mounted) return;
+
       setState(() {
         _isUploading = false;
-        _errorMessage = 'Error selecting image: $e';
+        _errorMessage = 'Firebase Storage upload failed: $e';
       });
+
+      _showUploadErrorDialog(e.toString());
     }
+  }
+
+  void _showUploadErrorDialog(String error) {
+    final colors = context.colors;
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: colors.surfaceElevated,
+        title: Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: colors.warning, size: 24),
+            const SizedBox(width: 10),
+            Text('Firebase Storage Upload', style: AppTextStyles.headingSmall.copyWith(color: colors.textPrimary)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'The image could not be uploaded to Firebase Storage:\n$error',
+              style: AppTextStyles.bodyMedium.copyWith(color: colors.textPrimary),
+            ),
+            const SizedBox(height: 14),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: colors.surfaceElevatedHigher,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: colors.border),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Troubleshooting checklist:', style: TextStyle(fontWeight: FontWeight.bold, color: colors.textPrimary, fontSize: 13)),
+                  const SizedBox(height: 6),
+                  Text('1. Go to Firebase Console -> Storage and verify Storage is enabled.', style: TextStyle(color: colors.textSecondary, fontSize: 12)),
+                  Text('2. Ensure Storage Rules allow read/write.', style: TextStyle(color: colors.textSecondary, fontSize: 12)),
+                  Text('3. You can still select an image preset or enter an external image URL below.', style: TextStyle(color: colors.textSecondary, fontSize: 12)),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              _showPresetPicker();
+            },
+            child: const Text('Pick Preset'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              _manualUrlEntry();
+            },
+            child: const Text('Enter URL'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(),
+            style: ElevatedButton.styleFrom(backgroundColor: colors.primaryRed, foregroundColor: Colors.white),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showPresetPicker() {
@@ -132,21 +230,23 @@ class _ImageUploaderState extends ConsumerState<ImageUploader> {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: colors.surfaceElevated,
-        title: Text('Select Placeholder Image Preset', style: AppTextStyles.headingSmall.copyWith(color: colors.textPrimary)),
+        title: Text('Select Preset Image', style: AppTextStyles.headingSmall.copyWith(color: colors.textPrimary)),
         content: SizedBox(
           width: 480,
           child: Wrap(
             spacing: 12,
             runSpacing: 12,
             children: presets.map((assetPath) {
-              final isSelected = _currentUrl == assetPath;
+              final firebaseUrl = FirebaseAssetUrls.getUrl(assetPath);
+              final isSelected = _currentUrl == firebaseUrl || _currentUrl == assetPath;
               return InkWell(
                 onTap: () {
                   setState(() {
-                    _currentUrl = assetPath;
+                    _currentUrl = firebaseUrl;
                     _previewBytes = null;
+                    _errorMessage = null;
                   });
-                  widget.onImageUploaded(assetPath);
+                  widget.onImageUploaded(firebaseUrl);
                   Navigator.of(context).pop();
                 },
                 borderRadius: BorderRadius.circular(8),
@@ -194,12 +294,12 @@ class _ImageUploaderState extends ConsumerState<ImageUploader> {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: colors.surfaceElevated,
-        title: Text('Enter Image URL / Asset Path', style: AppTextStyles.headingSmall.copyWith(color: colors.textPrimary)),
+        title: Text('Enter Image URL', style: AppTextStyles.headingSmall.copyWith(color: colors.textPrimary)),
         content: TextField(
           controller: controller,
           style: AppTextStyles.inputText.copyWith(color: colors.textPrimary),
           decoration: const InputDecoration(
-            hintText: 'https://... or assets/jet1.png',
+            hintText: 'https://...',
           ),
         ),
         actions: [
@@ -214,6 +314,7 @@ class _ImageUploaderState extends ConsumerState<ImageUploader> {
                 setState(() {
                   _currentUrl = val;
                   _previewBytes = null;
+                  _errorMessage = null;
                 });
                 widget.onImageUploaded(val);
               }
@@ -234,6 +335,7 @@ class _ImageUploaderState extends ConsumerState<ImageUploader> {
     setState(() {
       _currentUrl = null;
       _previewBytes = null;
+      _errorMessage = null;
     });
     widget.onImageUploaded('');
   }
@@ -242,6 +344,7 @@ class _ImageUploaderState extends ConsumerState<ImageUploader> {
   Widget build(BuildContext context) {
     final colors = context.colors;
     final hasImage = _previewBytes != null || (_currentUrl != null && _currentUrl!.isNotEmpty);
+    final isFirebaseUrl = _currentUrl != null && _currentUrl!.contains('firebasestorage');
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -251,6 +354,24 @@ class _ImageUploaderState extends ConsumerState<ImageUploader> {
             Text(widget.label, style: AppTextStyles.fieldLabel.copyWith(color: colors.textPrimary)),
             if (widget.isRequired)
               Text(' *', style: TextStyle(color: colors.primaryRed, fontWeight: FontWeight.bold)),
+            const Spacer(),
+            if (isFirebaseUrl)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: colors.success.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: colors.success.withOpacity(0.3)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.cloud_done, size: 13, color: colors.success),
+                    const SizedBox(width: 4),
+                    Text('Stored in Firebase', style: TextStyle(color: colors.success, fontSize: 11, fontWeight: FontWeight.w600)),
+                  ],
+                ),
+              ),
           ],
         ),
         const SizedBox(height: 8),
@@ -281,28 +402,11 @@ class _ImageUploaderState extends ConsumerState<ImageUploader> {
                   child: SizedBox(
                     width: double.infinity,
                     height: double.infinity,
-                    child: _previewBytes != null
-                        ? Image.memory(
-                            _previewBytes!,
-                            fit: widget.fit,
-                          )
-                        : (_currentUrl!.startsWith('data:image')
-                            ? Image.memory(
-                                base64Decode(_currentUrl!.split(',').last),
-                                fit: widget.fit,
-                                errorBuilder: (_, __, ___) => _buildPlaceholder(colors),
-                              )
-                            : (_currentUrl!.startsWith('http')
-                                ? Image.network(
-                                    _currentUrl!,
-                                    fit: widget.fit,
-                                    errorBuilder: (_, __, ___) => _buildPlaceholder(colors),
-                                  )
-                                : Image.asset(
-                                    _currentUrl!,
-                                    fit: widget.fit,
-                                    errorBuilder: (_, __, ___) => _buildPlaceholder(colors),
-                                  ))),
+                    child: SafeImage(
+                      imageUrl: _currentUrl ?? '',
+                      bytes: _previewBytes,
+                      fit: widget.fit,
+                    ),
                   ),
                 )
               else
@@ -310,14 +414,22 @@ class _ImageUploaderState extends ConsumerState<ImageUploader> {
 
               if (_isUploading)
                 Container(
-                  color: Colors.black.withOpacity(0.6),
+                  color: Colors.black.withOpacity(0.7),
                   child: Center(
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         CircularProgressIndicator(color: colors.primaryRed),
                         const SizedBox(height: 12),
-                        const Text('Uploading image...', style: TextStyle(color: Colors.white)),
+                        const Text(
+                          'Uploading image to Firebase...',
+                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                        ),
+                        const SizedBox(height: 4),
+                        const Text(
+                          'Storing in Firebase Storage bucket',
+                          style: TextStyle(color: Colors.white70, fontSize: 11),
+                        ),
                       ],
                     ),
                   ),
@@ -339,23 +451,23 @@ class _ImageUploaderState extends ConsumerState<ImageUploader> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         IconButton(
-                          icon: Icon(Icons.collections_outlined, size: 18, color: colors.textPrimary),
-                          onPressed: _showPresetPicker,
-                          tooltip: 'Select Placeholder Preset',
+                          icon: Icon(Icons.cloud_upload_outlined, size: 19, color: colors.primaryRed),
+                          onPressed: _pickAndUpload,
+                          tooltip: 'Upload to Firebase Storage',
                           constraints: const BoxConstraints(),
                           padding: const EdgeInsets.all(6),
                         ),
                         IconButton(
-                          icon: Icon(Icons.upload_file, size: 18, color: colors.textPrimary),
-                          onPressed: _pickAndUpload,
-                          tooltip: 'Upload / Select Image (Placeholder Mode)',
+                          icon: Icon(Icons.collections_outlined, size: 18, color: colors.textPrimary),
+                          onPressed: _showPresetPicker,
+                          tooltip: 'Select Preset Image',
                           constraints: const BoxConstraints(),
                           padding: const EdgeInsets.all(6),
                         ),
                         IconButton(
                           icon: Icon(Icons.link, size: 18, color: colors.textPrimary),
                           onPressed: _manualUrlEntry,
-                          tooltip: 'Set URL / Asset Path',
+                          tooltip: 'Set Direct Image URL',
                           constraints: const BoxConstraints(),
                           padding: const EdgeInsets.all(6),
                         ),
@@ -375,13 +487,26 @@ class _ImageUploaderState extends ConsumerState<ImageUploader> {
           ),
         ),
         if (_errorMessage != null) ...[
-          const SizedBox(height: 4),
-          Text(_errorMessage!, style: TextStyle(color: colors.error, fontSize: 12)),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              Icon(Icons.error_outline, size: 14, color: colors.error),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  _errorMessage!,
+                  style: TextStyle(color: colors.error, fontSize: 12),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
         ],
         if (_currentUrl != null && _currentUrl!.isNotEmpty) ...[
           const SizedBox(height: 4),
           Text(
-            'Path: $_currentUrl',
+            'Saved URL: $_currentUrl',
             style: AppTextStyles.bodySmall.copyWith(color: colors.textSecondary, fontSize: 11),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
@@ -401,9 +526,9 @@ class _ImageUploaderState extends ConsumerState<ImageUploader> {
           children: [
             Icon(Icons.add_photo_alternate_outlined, size: 38, color: colors.textSecondary.withOpacity(0.7)),
             const SizedBox(height: 10),
-            Text('Click to upload image or drop file', style: AppTextStyles.subtitle.copyWith(color: colors.textSecondary)),
+            Text('Click to upload image to Firebase', style: AppTextStyles.subtitle.copyWith(color: colors.textPrimary, fontWeight: FontWeight.w600)),
             const SizedBox(height: 4),
-            Text('PNG, JPG, WEBP up to 10MB', style: AppTextStyles.bodySmall.copyWith(color: colors.textMuted, fontSize: 11)),
+            Text('Uploads directly to Firebase Storage bucket (PNG, JPG, WEBP)', style: AppTextStyles.bodySmall.copyWith(color: colors.textMuted, fontSize: 11)),
           ],
         ),
       ),

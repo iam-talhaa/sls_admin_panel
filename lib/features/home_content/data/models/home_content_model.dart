@@ -1,3 +1,4 @@
+import '../../../../core/constants/firebase_asset_urls.dart';
 import '../../../../core/models/localized_text.dart';
 
 class RouteCardAdminModel {
@@ -23,7 +24,7 @@ class RouteCardAdminModel {
       title: LocalizedText.fromMap(map['title']),
       category: LocalizedText.fromMap(map['category']),
       duration: map['duration']?.toString() ?? '',
-      imageUrl: map['imageUrl']?.toString() ?? '',
+      imageUrl: FirebaseAssetUrls.getUrl(map['imageUrl']?.toString() ?? ''),
       overlayTag: LocalizedText.fromMap(map['overlayTag']),
     );
   }

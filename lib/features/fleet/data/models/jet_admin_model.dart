@@ -1,3 +1,4 @@
+import '../../../../core/constants/firebase_asset_urls.dart';
 import '../../../../core/models/localized_text.dart';
 
 class JetAdminModel {
@@ -37,14 +38,41 @@ class JetAdminModel {
   }
 
   factory JetAdminModel.fromMap(Map<String, dynamic> data, [String id = '']) {
+    String parsedCategory = 'LIGHT JET';
+    if (data['category'] is Map) {
+      parsedCategory = LocalizedText.fromMap(data['category']).en;
+    } else if (data['category'] != null) {
+      parsedCategory = data['category'].toString();
+    }
+
+    final parsedName = LocalizedText.fromMap(data['name'] ?? data['title']);
+
+    LocalizedText parsedSeating;
+    if (data['seating'] != null) {
+      parsedSeating = LocalizedText.fromMap(data['seating']);
+    } else if (data['seatingCapacity'] != null) {
+      parsedSeating = LocalizedText(en: 'Up to ${data['seatingCapacity']} passengers');
+    } else {
+      parsedSeating = const LocalizedText(en: 'SEATING : UP TO 4');
+    }
+
+    LocalizedText parsedRange;
+    if (data['range'] != null) {
+      parsedRange = LocalizedText.fromMap(data['range']);
+    } else if (data['rangeKm'] != null) {
+      parsedRange = LocalizedText(en: '${data['rangeKm']} km');
+    } else {
+      parsedRange = const LocalizedText(en: 'RANGE : UP TO 2.5 HOURS');
+    }
+
     return JetAdminModel(
       id: id.isNotEmpty ? id : (data['id']?.toString() ?? ''),
       order: (data['order'] is num) ? (data['order'] as num).toInt() : 0,
-      category: data['category']?.toString() ?? 'LIGHT JET',
-      imageUrl: data['imageUrl']?.toString() ?? '',
-      name: LocalizedText.fromMap(data['name']),
-      seating: LocalizedText.fromMap(data['seating']),
-      range: LocalizedText.fromMap(data['range']),
+      category: parsedCategory.isNotEmpty ? parsedCategory : 'LIGHT JET',
+      imageUrl: FirebaseAssetUrls.getUrl(data['imageUrl']?.toString() ?? ''),
+      name: parsedName,
+      seating: parsedSeating,
+      range: parsedRange,
       description: LocalizedText.fromMap(data['description']),
       isActive: data['isActive'] == true || data['isActive'] == null,
       createdAt: _parseDateTime(data['createdAt']),

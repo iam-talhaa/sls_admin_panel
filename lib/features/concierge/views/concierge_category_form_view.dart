@@ -131,10 +131,11 @@ class _ConciergeCategoryFormViewState extends ConsumerState<ConciergeCategoryFor
   }
 
   Future<void> _handleSave() async {
+    final messenger = ScaffoldMessenger.of(context);
     final colors = context.colors;
 
     if (_tabTitle.en.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         SnackBar(
           content: const Text('Please enter a Tab Title in English.'),
           backgroundColor: colors.error,
@@ -144,7 +145,7 @@ class _ConciergeCategoryFormViewState extends ConsumerState<ConciergeCategoryFor
     }
 
     if (_title.en.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         SnackBar(
           content: const Text('Please enter a Category Title in English.'),
           backgroundColor: colors.error,
@@ -172,7 +173,7 @@ class _ConciergeCategoryFormViewState extends ConsumerState<ConciergeCategoryFor
       }
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        messenger.showSnackBar(
           SnackBar(
             content: Text(isNew ? 'Concierge category created successfully!' : 'Concierge category updated successfully!'),
             backgroundColor: colors.success,
@@ -182,12 +183,11 @@ class _ConciergeCategoryFormViewState extends ConsumerState<ConciergeCategoryFor
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        setState(() => _isSaving = false);
+        messenger.showSnackBar(
           SnackBar(content: Text('Error saving category: $e'), backgroundColor: colors.error),
         );
       }
-    } finally {
-      if (mounted) setState(() => _isSaving = false);
     }
   }
 
@@ -504,25 +504,10 @@ class _ConciergeCategoryFormViewState extends ConsumerState<ConciergeCategoryFor
                   ),
                 )
               else
-                ReorderableListView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: _features.length,
-                  onReorder: (oldIndex, newIndex) {
-                    setState(() {
-                      if (newIndex > oldIndex) newIndex -= 1;
-                      final item = _features.removeAt(oldIndex);
-                      _features.insert(newIndex, item);
-                      for (int i = 0; i < _features.length; i++) {
-                        _features[i] = _features[i].copyWith(sortOrder: i + 1);
-                      }
-                    });
-                  },
-                  buildDefaultDragHandles: false,
-                  itemBuilder: (context, index) {
+                Column(
+                  children: List.generate(_features.length, (index) {
                     final feature = _features[index];
                     return Container(
-                      key: ValueKey(feature.id.isNotEmpty ? feature.id : 'feat_$index'),
                       margin: const EdgeInsets.only(bottom: 16),
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
@@ -533,14 +518,50 @@ class _ConciergeCategoryFormViewState extends ConsumerState<ConciergeCategoryFor
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          ReorderableDragStartListener(
-                            index: index,
-                            child: MouseRegion(
-                              cursor: SystemMouseCursors.grab,
-                              child: Padding(
-                                padding: const EdgeInsets.only(top: 10, right: 12),
-                                child: Icon(Icons.drag_indicator, color: colors.textSecondary, size: 20),
-                              ),
+                          Padding(
+                            padding: const EdgeInsets.only(top: 10, right: 12),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  icon: const Icon(Icons.arrow_upward, size: 16),
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
+                                  color: colors.textSecondary,
+                                  disabledColor: colors.border.withOpacity(0.3),
+                                  tooltip: 'Move Up',
+                                  onPressed: index > 0
+                                      ? () {
+                                          setState(() {
+                                            final item = _features.removeAt(index);
+                                            _features.insert(index - 1, item);
+                                            for (int i = 0; i < _features.length; i++) {
+                                              _features[i] = _features[i].copyWith(sortOrder: i + 1);
+                                            }
+                                          });
+                                        }
+                                      : null,
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.arrow_downward, size: 16),
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
+                                  color: colors.textSecondary,
+                                  disabledColor: colors.border.withOpacity(0.3),
+                                  tooltip: 'Move Down',
+                                  onPressed: index < _features.length - 1
+                                      ? () {
+                                          setState(() {
+                                            final item = _features.removeAt(index);
+                                            _features.insert(index + 1, item);
+                                            for (int i = 0; i < _features.length; i++) {
+                                              _features[i] = _features[i].copyWith(sortOrder: i + 1);
+                                            }
+                                          });
+                                        }
+                                      : null,
+                                ),
+                              ],
                             ),
                           ),
                           Expanded(
@@ -563,7 +584,7 @@ class _ConciergeCategoryFormViewState extends ConsumerState<ConciergeCategoryFor
                         ],
                       ),
                     );
-                  },
+                  }),
                 ),
             ],
           ),

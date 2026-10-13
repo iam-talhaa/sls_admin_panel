@@ -1,3 +1,4 @@
+import '../../../../core/constants/firebase_asset_urls.dart';
 import '../../../../core/models/content_block.dart';
 import '../../../../core/models/localized_text.dart';
 
@@ -48,7 +49,7 @@ class BlogAdminModel {
       order: data['order'] is num ? (data['order'] as num).toInt() : int.tryParse(data['order']?.toString() ?? '') ?? 0,
       title: LocalizedText.fromMap(data['title']),
       excerpt: LocalizedText.fromMap(data['excerpt']),
-      imageUrl: data['imageUrl']?.toString() ?? '',
+      imageUrl: FirebaseAssetUrls.getUrl(data['imageUrl']?.toString() ?? ''),
       contentBlocks: blocks,
       isPublished: data['isPublished'] == true,
       publishedAt: _parseDateTime(data['publishedAt']),

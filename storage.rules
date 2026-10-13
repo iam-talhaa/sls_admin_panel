@@ -1,0 +1,11 @@
+rules_version = '2';
+
+// Craft rules based on data in a request or document
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /{allPaths=**} {
+      // Allow read and write for all paths (public assets, admin uploads)
+      allow read, write: if true;
+    }
+  }
+}

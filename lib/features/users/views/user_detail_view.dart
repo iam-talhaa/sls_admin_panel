@@ -57,16 +57,17 @@ class _UserDetailViewState extends ConsumerState<UserDetailView> {
     );
 
     if (confirmed && mounted) {
+      final messenger = ScaffoldMessenger.of(context);
       await ref
           .read(usersRepositoryProvider)
           .setUserDisabled(_user!.uid, newDisabled);
       ref.invalidate(usersListFutureProvider);
       ref.invalidate(usersListStreamProvider);
-      setState(() {
-        _user = _user!.copyWith(disabled: newDisabled);
-      });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        setState(() {
+          _user = _user!.copyWith(disabled: newDisabled);
+        });
+        messenger.showSnackBar(
           SnackBar(
             content: Text(
               'User account ${newDisabled ? 'disabled' : 'enabled'} in Firebase',
@@ -92,11 +93,12 @@ class _UserDetailViewState extends ConsumerState<UserDetailView> {
     );
 
     if (confirmed && mounted) {
+      final messenger = ScaffoldMessenger.of(context);
       await ref.read(usersRepositoryProvider).deleteUser(_user!.uid);
       ref.invalidate(usersListFutureProvider);
       ref.invalidate(usersListStreamProvider);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        messenger.showSnackBar(
           SnackBar(
             content: const Text('User account deleted from Firebase'),
             backgroundColor: colors.success,

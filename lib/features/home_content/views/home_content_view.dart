@@ -39,6 +39,7 @@ class _HomeContentViewState extends ConsumerState<HomeContentView> {
   }
 
   Future<void> _handleSave() async {
+    final messenger = ScaffoldMessenger.of(context);
     final colors = context.colors;
     setState(() => _isSaving = true);
     try {
@@ -48,7 +49,7 @@ class _HomeContentViewState extends ConsumerState<HomeContentView> {
       );
       await ref.read(homeContentRepositoryProvider).saveHomeContent(updated);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        messenger.showSnackBar(
           SnackBar(
             content: const Text('Home page content saved successfully!'),
             backgroundColor: colors.success,
@@ -57,7 +58,7 @@ class _HomeContentViewState extends ConsumerState<HomeContentView> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        messenger.showSnackBar(
           SnackBar(content: Text('Error saving home content: $e'), backgroundColor: colors.error),
         );
       }
@@ -181,22 +182,10 @@ class _HomeContentViewState extends ConsumerState<HomeContentView> {
                 if (_routeCards.isEmpty)
                   Text('No route cards defined yet. Click "+ Add Route Card" to start.', style: AppTextStyles.subtitle.copyWith(color: colors.textSecondary))
                 else
-                  ReorderableListView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: _routeCards.length,
-                    onReorder: (oldIdx, newIdx) {
-                      setState(() {
-                        if (newIdx > oldIdx) newIdx -= 1;
-                        final item = _routeCards.removeAt(oldIdx);
-                        _routeCards.insert(newIdx, item);
-                      });
-                    },
-                    buildDefaultDragHandles: false,
-                    itemBuilder: (context, index) {
+                  Column(
+                    children: List.generate(_routeCards.length, (index) {
                       final card = _routeCards[index];
                       return Container(
-                        key: ValueKey(card.id),
                         margin: const EdgeInsets.only(bottom: 20),
                         padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(
@@ -220,33 +209,58 @@ class _HomeContentViewState extends ConsumerState<HomeContentView> {
                               children: [
                                 Row(
                                   children: [
-                                    ReorderableDragStartListener(
-                                      index: index,
-                                      child: MouseRegion(
-                                        cursor: SystemMouseCursors.grab,
-                                        child: Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                          decoration: BoxDecoration(
-                                            color: colors.surfaceElevated,
-                                            borderRadius: BorderRadius.circular(6),
-                                            border: Border.all(color: colors.border, width: 0.8),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: colors.surfaceElevated,
+                                        borderRadius: BorderRadius.circular(6),
+                                        border: Border.all(color: colors.border, width: 0.8),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          IconButton(
+                                            icon: const Icon(Icons.arrow_upward, size: 15),
+                                            padding: EdgeInsets.zero,
+                                            constraints: const BoxConstraints(minWidth: 22, minHeight: 22),
+                                            color: colors.textSecondary,
+                                            disabledColor: colors.border.withOpacity(0.3),
+                                            tooltip: 'Move Up',
+                                            onPressed: index > 0
+                                                ? () {
+                                                    setState(() {
+                                                      final item = _routeCards.removeAt(index);
+                                                      _routeCards.insert(index - 1, item);
+                                                    });
+                                                  }
+                                                : null,
                                           ),
-                                          child: Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              Icon(Icons.drag_indicator, color: colors.textSecondary, size: 18),
-                                              const SizedBox(width: 4),
-                                              Text(
-                                                'Card #${index + 1}',
-                                                style: AppTextStyles.subtitle.copyWith(
-                                                  color: colors.textPrimary,
-                                                  fontWeight: FontWeight.w600,
-                                                  fontSize: 13,
-                                                ),
-                                              ),
-                                            ],
+                                          IconButton(
+                                            icon: const Icon(Icons.arrow_downward, size: 15),
+                                            padding: EdgeInsets.zero,
+                                            constraints: const BoxConstraints(minWidth: 22, minHeight: 22),
+                                            color: colors.textSecondary,
+                                            disabledColor: colors.border.withOpacity(0.3),
+                                            tooltip: 'Move Down',
+                                            onPressed: index < _routeCards.length - 1
+                                                ? () {
+                                                    setState(() {
+                                                      final item = _routeCards.removeAt(index);
+                                                      _routeCards.insert(index + 1, item);
+                                                    });
+                                                  }
+                                                : null,
                                           ),
-                                        ),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            'Card #${index + 1}',
+                                            style: AppTextStyles.subtitle.copyWith(
+                                              color: colors.textPrimary,
+                                              fontWeight: FontWeight.w600,
+                                              fontSize: 13,
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ),
                                     const Spacer(),
@@ -276,7 +290,9 @@ class _HomeContentViewState extends ConsumerState<HomeContentView> {
                                           fit: BoxFit.cover,
                                           storagePath: 'home_cards/${card.id}',
                                           onImageUploaded: (url) {
-                                            _routeCards[index] = card.copyWith(imageUrl: url);
+                                            setState(() {
+                                              _routeCards[index] = card.copyWith(imageUrl: url);
+                                            });
                                           },
                                         ),
                                       ),
@@ -372,7 +388,9 @@ class _HomeContentViewState extends ConsumerState<HomeContentView> {
                                     fit: BoxFit.cover,
                                     storagePath: 'home_cards/${card.id}',
                                     onImageUploaded: (url) {
-                                      _routeCards[index] = card.copyWith(imageUrl: url);
+                                      setState(() {
+                                        _routeCards[index] = card.copyWith(imageUrl: url);
+                                      });
                                     },
                                   ),
                                   const SizedBox(height: 16),
@@ -439,7 +457,7 @@ class _HomeContentViewState extends ConsumerState<HomeContentView> {
                           },
                         ),
                       );
-                    },
+                    }),
                   ),
               ],
             ),

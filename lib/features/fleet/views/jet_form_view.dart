@@ -81,9 +81,10 @@ class _JetFormViewState extends ConsumerState<JetFormView> {
   }
 
   Future<void> _handleSave() async {
+    final messenger = ScaffoldMessenger.of(context);
     final colors = context.colors;
     if (!_formKey.currentState!.validate()) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         SnackBar(
           content: const Text('Please complete all required fields.'),
           backgroundColor: colors.error,
@@ -93,7 +94,7 @@ class _JetFormViewState extends ConsumerState<JetFormView> {
     }
 
     if (_name.en.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         SnackBar(
           content: const Text('Please enter an aircraft name in English.'),
           backgroundColor: colors.error,
@@ -108,7 +109,7 @@ class _JetFormViewState extends ConsumerState<JetFormView> {
 
     try {
       final jet = JetAdminModel(
-        id: isNew ? '' : _id,
+        id: _id,
         order: _order,
         category: _category,
         imageUrl: _imageUrl,
@@ -122,7 +123,7 @@ class _JetFormViewState extends ConsumerState<JetFormView> {
       await ref.read(fleetRepositoryProvider).saveJet(jet);
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        messenger.showSnackBar(
           SnackBar(
             content: Text(isNew ? 'Aircraft added to fleet successfully!' : 'Aircraft updated successfully!'),
             backgroundColor: colors.success,
@@ -132,15 +133,12 @@ class _JetFormViewState extends ConsumerState<JetFormView> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error saving aircraft: $e'), backgroundColor: colors.error),
-        );
-      }
-    } finally {
-      if (mounted) {
         setState(() {
           _isSaving = false;
         });
+        messenger.showSnackBar(
+          SnackBar(content: Text('Error saving aircraft: $e'), backgroundColor: colors.error),
+        );
       }
     }
   }
@@ -292,8 +290,8 @@ class _JetFormViewState extends ConsumerState<JetFormView> {
                           ImageUploader(
                             label: 'Aircraft Featured Image',
                             initialImageUrl: _imageUrl,
-                            storagePath: 'jets/${isNew ? 'temp_${DateTime.now().millisecondsSinceEpoch}' : _id}',
-                            onImageUploaded: (url) => _imageUrl = url,
+                            storagePath: 'jets/$_id',
+                            onImageUploaded: (url) => setState(() => _imageUrl = url),
                           ),
 
                           const SizedBox(height: 20),

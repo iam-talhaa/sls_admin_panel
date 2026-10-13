@@ -6,6 +6,7 @@ import '../../../core/constants/app_text_styles.dart';
 import '../../../core/widgets/confirm_dialog.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/status_badge.dart';
+import '../../../core/widgets/safe_image.dart';
 import '../data/models/blog_admin_model.dart';
 import '../data/repositories/blog_repository.dart';
 
@@ -74,11 +75,10 @@ class _BlogListViewState extends ConsumerState<BlogListView> {
     }
   }
 
-  Future<void> _onReorder(List<BlogAdminModel> currentList, int oldIndex, int newIndex) async {
+  Future<void> _moveBlog(List<BlogAdminModel> currentList, int oldIndex, int newIndex) async {
+    if (newIndex < 0 || newIndex >= currentList.length) return;
+    FocusScope.of(context).unfocus();
     final colors = context.colors;
-    if (newIndex > oldIndex) {
-      newIndex -= 1;
-    }
     final items = List<BlogAdminModel>.from(currentList);
     final movedItem = items.removeAt(oldIndex);
     items.insert(newIndex, movedItem);
@@ -324,7 +324,13 @@ class _BlogListViewState extends ConsumerState<BlogListView> {
                             ),
                             child: Row(
                               children: [
-                                const SizedBox(width: 32),
+                                SizedBox(
+                                  width: 44,
+                                  child: Center(
+                                    child: Text('ORDER', style: TextStyle(color: colors.textSecondary, fontSize: 11, fontWeight: FontWeight.w600)),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
                                 SizedBox(
                                   width: 80,
                                   child: Text('ID', style: TextStyle(color: colors.textSecondary, fontSize: 12, fontWeight: FontWeight.w600)),
@@ -353,17 +359,11 @@ class _BlogListViewState extends ConsumerState<BlogListView> {
                           ),
                           Divider(height: 1, color: colors.border),
 
-                          // Reorderable Blog Items List
-                          ReorderableListView.builder(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            itemCount: filtered.length,
-                            onReorder: (oldIdx, newIdx) => _onReorder(filtered, oldIdx, newIdx),
-                            buildDefaultDragHandles: false,
-                            itemBuilder: (context, index) {
+                          // Blog Table Rows
+                          Column(
+                            children: List.generate(filtered.length, (index) {
                               final blog = filtered[index];
                               return Container(
-                                key: ValueKey(blog.id.isNotEmpty ? blog.id : 'blog_$index'),
                                 decoration: BoxDecoration(
                                   border: Border(bottom: BorderSide(color: colors.border)),
                                 ),
@@ -376,36 +376,73 @@ class _BlogListViewState extends ConsumerState<BlogListView> {
                                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                                       child: Row(
                                         children: [
-                                          // Drag Handle
-                                          ReorderableDragStartListener(
-                                            index: index,
-                                            child: MouseRegion(
-                                              cursor: SystemMouseCursors.grab,
-                                              child: Padding(
-                                                padding: const EdgeInsets.only(right: 12.0),
-                                                child: Icon(Icons.drag_indicator, color: colors.textSecondary, size: 20),
-                                              ),
+                                          // Reorder Controls (Move Up / Down)
+                                          SizedBox(
+                                            width: 44,
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                IconButton(
+                                                  icon: const Icon(Icons.arrow_upward, size: 15),
+                                                  padding: EdgeInsets.zero,
+                                                  constraints: const BoxConstraints(minWidth: 20, minHeight: 24),
+                                                  color: colors.textSecondary,
+                                                  disabledColor: colors.border.withOpacity(0.3),
+                                                  tooltip: 'Move Up',
+                                                  onPressed: index > 0
+                                                      ? () => _moveBlog(filtered, index, index - 1)
+                                                      : null,
+                                                ),
+                                                IconButton(
+                                                  icon: const Icon(Icons.arrow_downward, size: 15),
+                                                  padding: EdgeInsets.zero,
+                                                  constraints: const BoxConstraints(minWidth: 20, minHeight: 24),
+                                                  color: colors.textSecondary,
+                                                  disabledColor: colors.border.withOpacity(0.3),
+                                                  tooltip: 'Move Down',
+                                                  onPressed: index < filtered.length - 1
+                                                      ? () => _moveBlog(filtered, index, index + 1)
+                                                      : null,
+                                                ),
+                                              ],
                                             ),
                                           ),
+                                          const SizedBox(width: 8),
 
-                                          // ID Badge / Icon
+                                          // ID Badge / Image
                                           Container(
                                             width: 60,
-                                            height: 38,
+                                            height: 40,
                                             decoration: BoxDecoration(
                                               color: colors.surfaceElevatedHigher,
                                               borderRadius: BorderRadius.circular(6),
                                               border: Border.all(color: colors.border),
                                             ),
+                                            clipBehavior: Clip.antiAlias,
                                             alignment: Alignment.center,
-                                            child: Text(
-                                              blog.id.replaceAll('blog_', '#'),
-                                              style: TextStyle(
-                                                color: colors.primaryRed,
-                                                fontWeight: FontWeight.bold,
-                                                fontSize: 13,
-                                              ),
-                                            ),
+                                            child: blog.imageUrl.isNotEmpty
+                                                ? SafeImage(
+                                                    imageUrl: blog.imageUrl,
+                                                    fit: BoxFit.cover,
+                                                    placeholder: Center(
+                                                      child: Text(
+                                                        blog.id.replaceAll('blog_', '#'),
+                                                        style: TextStyle(
+                                                          color: colors.primaryRed,
+                                                          fontWeight: FontWeight.bold,
+                                                          fontSize: 12,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  )
+                                                : Text(
+                                                    blog.id.replaceAll('blog_', '#'),
+                                                    style: TextStyle(
+                                                      color: colors.primaryRed,
+                                                      fontWeight: FontWeight.bold,
+                                                      fontSize: 13,
+                                                    ),
+                                                  ),
                                           ),
                                           const SizedBox(width: 20),
 
@@ -505,7 +542,7 @@ class _BlogListViewState extends ConsumerState<BlogListView> {
                                   ),
                                 ),
                               );
-                            },
+                            }),
                           ),
                         ],
                       ),

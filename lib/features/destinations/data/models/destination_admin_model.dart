@@ -1,3 +1,4 @@
+import '../../../../core/constants/firebase_asset_urls.dart';
 import '../../../../core/models/content_block.dart';
 import '../../../../core/models/localized_text.dart';
 
@@ -74,7 +75,7 @@ class DestinationAdminModel {
       title: LocalizedText.fromMap(data['title']),
       category: LocalizedText.fromMap(data['category']),
       duration: data['duration']?.toString() ?? '',
-      imageUrl: data['imageUrl']?.toString() ?? '',
+      imageUrl: FirebaseAssetUrls.getUrl(data['imageUrl']?.toString() ?? ''),
       overlayTag: LocalizedText.fromMap(data['overlayTag']),
       jetType: data['jetType']?.toString() ?? 'Light Jet',
       seating: LocalizedText.fromMap(data['seating']),

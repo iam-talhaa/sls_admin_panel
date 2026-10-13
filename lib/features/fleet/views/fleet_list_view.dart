@@ -6,6 +6,7 @@ import '../../../core/constants/app_text_styles.dart';
 import '../../../core/widgets/confirm_dialog.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/status_badge.dart';
+import '../../../core/widgets/safe_image.dart';
 import '../data/models/jet_admin_model.dart';
 import '../data/repositories/fleet_repository.dart';
 
@@ -80,11 +81,10 @@ class _FleetListViewState extends ConsumerState<FleetListView> {
     }
   }
 
-  Future<void> _onReorder(List<JetAdminModel> currentList, int oldIndex, int newIndex) async {
+  Future<void> _moveJet(List<JetAdminModel> currentList, int oldIndex, int newIndex) async {
+    if (newIndex < 0 || newIndex >= currentList.length) return;
+    FocusScope.of(context).unfocus();
     final colors = context.colors;
-    if (newIndex > oldIndex) {
-      newIndex -= 1;
-    }
     final items = List<JetAdminModel>.from(currentList);
     final movedItem = items.removeAt(oldIndex);
     items.insert(newIndex, movedItem);
@@ -100,22 +100,12 @@ class _FleetListViewState extends ConsumerState<FleetListView> {
     }
   }
 
+
   Widget _buildThumbnail(String imageUrl, dynamic colors) {
-    if (imageUrl.isEmpty) {
-      return Icon(Icons.flight, color: colors.textSecondary, size: 18);
-    }
-    if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
-      return Image.network(
-        imageUrl,
-        fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => Icon(Icons.flight, color: colors.textSecondary, size: 18),
-      );
-    }
-    final assetPath = imageUrl.startsWith('assets/') ? imageUrl : 'assets/$imageUrl';
-    return Image.asset(
-      assetPath,
+    return SafeImage(
+      imageUrl: imageUrl,
       fit: BoxFit.cover,
-      errorBuilder: (_, __, ___) => Icon(Icons.flight, color: colors.textSecondary, size: 18),
+      placeholder: Icon(Icons.flight, color: colors.textSecondary, size: 18),
     );
   }
 
@@ -262,8 +252,10 @@ class _FleetListViewState extends ConsumerState<FleetListView> {
                   DropdownMenuItem(value: 'ALL', child: Text('All Categories')),
                   DropdownMenuItem(value: 'LIGHT JET', child: Text('Light Jets')),
                   DropdownMenuItem(value: 'MIDSIZE JET', child: Text('Midsize Jets')),
+                  DropdownMenuItem(value: 'SUPER MIDSIZE JET', child: Text('Super Midsize Jets')),
                   DropdownMenuItem(value: 'HEAVY JET', child: Text('Heavy Jets')),
                   DropdownMenuItem(value: 'HELICOPTER', child: Text('Helicopters')),
+                  DropdownMenuItem(value: 'TURBOPROP', child: Text('Turboprops')),
                 ],
                 onChanged: (val) {
                   if (val != null) setState(() => _selectedCategory = val);
@@ -359,7 +351,13 @@ class _FleetListViewState extends ConsumerState<FleetListView> {
                             ),
                             child: Row(
                               children: [
-                                const SizedBox(width: 32), // Drag handle spacing
+                                SizedBox(
+                                  width: 44,
+                                  child: Center(
+                                    child: Text('ORDER', style: TextStyle(color: colors.textSecondary, fontSize: 11, fontWeight: FontWeight.w600)),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
                                 SizedBox(
                                   width: 80,
                                   child: Text('IMAGE', style: TextStyle(color: colors.textSecondary, fontSize: 12, fontWeight: FontWeight.w600)),
@@ -392,17 +390,11 @@ class _FleetListViewState extends ConsumerState<FleetListView> {
                           ),
                           Divider(height: 1, color: colors.border),
 
-                          // Reorderable Items
-                          ReorderableListView.builder(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            itemCount: filtered.length,
-                            onReorder: (oldIdx, newIdx) => _onReorder(filtered, oldIdx, newIdx),
-                            buildDefaultDragHandles: false,
-                            itemBuilder: (context, index) {
+                          // Fleet Table Rows
+                          Column(
+                            children: List.generate(filtered.length, (index) {
                               final jet = filtered[index];
                               return Container(
-                                key: ValueKey(jet.id.isNotEmpty ? jet.id : 'jet_$index'),
                                 decoration: BoxDecoration(
                                   border: Border(bottom: BorderSide(color: colors.border)),
                                 ),
@@ -415,17 +407,38 @@ class _FleetListViewState extends ConsumerState<FleetListView> {
                                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                                       child: Row(
                                         children: [
-                                          // Drag Handle
-                                          ReorderableDragStartListener(
-                                            index: index,
-                                            child: MouseRegion(
-                                              cursor: SystemMouseCursors.grab,
-                                              child: Padding(
-                                                padding: const EdgeInsets.only(right: 12.0),
-                                                child: Icon(Icons.drag_indicator, color: colors.textSecondary, size: 20),
-                                              ),
+                                          // Reorder Controls (Move Up / Down)
+                                          SizedBox(
+                                            width: 44,
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                IconButton(
+                                                  icon: const Icon(Icons.arrow_upward, size: 15),
+                                                  padding: EdgeInsets.zero,
+                                                  constraints: const BoxConstraints(minWidth: 20, minHeight: 24),
+                                                  color: colors.textSecondary,
+                                                  disabledColor: colors.border.withOpacity(0.3),
+                                                  tooltip: 'Move Up',
+                                                  onPressed: index > 0
+                                                      ? () => _moveJet(filtered, index, index - 1)
+                                                      : null,
+                                                ),
+                                                IconButton(
+                                                  icon: const Icon(Icons.arrow_downward, size: 15),
+                                                  padding: EdgeInsets.zero,
+                                                  constraints: const BoxConstraints(minWidth: 20, minHeight: 24),
+                                                  color: colors.textSecondary,
+                                                  disabledColor: colors.border.withOpacity(0.3),
+                                                  tooltip: 'Move Down',
+                                                  onPressed: index < filtered.length - 1
+                                                      ? () => _moveJet(filtered, index, index + 1)
+                                                      : null,
+                                                ),
+                                              ],
                                             ),
                                           ),
+                                          const SizedBox(width: 8),
 
                                           // Thumbnail
                                           Container(
@@ -531,7 +544,7 @@ class _FleetListViewState extends ConsumerState<FleetListView> {
                                   ),
                                 ),
                               );
-                            },
+                            }),
                           ),
                         ],
                       ),

@@ -6,6 +6,7 @@ import '../../../core/constants/app_text_styles.dart';
 import '../../../core/widgets/confirm_dialog.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/status_badge.dart';
+import '../../../core/widgets/safe_image.dart';
 import '../data/models/destination_admin_model.dart';
 import '../data/repositories/destinations_repository.dart';
 
@@ -74,11 +75,10 @@ class _DestinationsListViewState extends ConsumerState<DestinationsListView> {
     }
   }
 
-  Future<void> _onReorder(List<DestinationAdminModel> currentList, int oldIndex, int newIndex) async {
+  Future<void> _moveDestination(List<DestinationAdminModel> currentList, int oldIndex, int newIndex) async {
+    if (newIndex < 0 || newIndex >= currentList.length) return;
+    FocusScope.of(context).unfocus();
     final colors = context.colors;
-    if (newIndex > oldIndex) {
-      newIndex -= 1;
-    }
     final items = List<DestinationAdminModel>.from(currentList);
     final movedItem = items.removeAt(oldIndex);
     items.insert(newIndex, movedItem);
@@ -327,7 +327,13 @@ class _DestinationsListViewState extends ConsumerState<DestinationsListView> {
                             ),
                             child: Row(
                               children: [
-                                const SizedBox(width: 32),
+                                SizedBox(
+                                  width: 44,
+                                  child: Center(
+                                    child: Text('ORDER', style: TextStyle(color: colors.textSecondary, fontSize: 11, fontWeight: FontWeight.w600)),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
                                 SizedBox(
                                   width: 80,
                                   child: Text('IMAGE', style: TextStyle(color: colors.textSecondary, fontSize: 12, fontWeight: FontWeight.w600)),
@@ -360,17 +366,11 @@ class _DestinationsListViewState extends ConsumerState<DestinationsListView> {
                           ),
                           Divider(height: 1, color: colors.border),
 
-                          // Reorderable List
-                          ReorderableListView.builder(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            itemCount: filtered.length,
-                            onReorder: (oldIdx, newIdx) => _onReorder(filtered, oldIdx, newIdx),
-                            buildDefaultDragHandles: false,
-                            itemBuilder: (context, index) {
+                          // Destinations Table Rows
+                          Column(
+                            children: List.generate(filtered.length, (index) {
                               final dest = filtered[index];
                               return Container(
-                                key: ValueKey(dest.id.isNotEmpty ? dest.id : 'dest_$index'),
                                 decoration: BoxDecoration(
                                   border: Border(bottom: BorderSide(color: colors.border)),
                                 ),
@@ -383,17 +383,38 @@ class _DestinationsListViewState extends ConsumerState<DestinationsListView> {
                                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                                       child: Row(
                                         children: [
-                                          // Drag Handle
-                                          ReorderableDragStartListener(
-                                            index: index,
-                                            child: MouseRegion(
-                                              cursor: SystemMouseCursors.grab,
-                                              child: Padding(
-                                                padding: const EdgeInsets.only(right: 12.0),
-                                                child: Icon(Icons.drag_indicator, color: colors.textSecondary, size: 20),
-                                              ),
+                                          // Reorder Controls (Move Up / Down)
+                                          SizedBox(
+                                            width: 44,
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                IconButton(
+                                                  icon: const Icon(Icons.arrow_upward, size: 15),
+                                                  padding: EdgeInsets.zero,
+                                                  constraints: const BoxConstraints(minWidth: 20, minHeight: 24),
+                                                  color: colors.textSecondary,
+                                                  disabledColor: colors.border.withOpacity(0.3),
+                                                  tooltip: 'Move Up',
+                                                  onPressed: index > 0
+                                                      ? () => _moveDestination(filtered, index, index - 1)
+                                                      : null,
+                                                ),
+                                                IconButton(
+                                                  icon: const Icon(Icons.arrow_downward, size: 15),
+                                                  padding: EdgeInsets.zero,
+                                                  constraints: const BoxConstraints(minWidth: 20, minHeight: 24),
+                                                  color: colors.textSecondary,
+                                                  disabledColor: colors.border.withOpacity(0.3),
+                                                  tooltip: 'Move Down',
+                                                  onPressed: index < filtered.length - 1
+                                                      ? () => _moveDestination(filtered, index, index + 1)
+                                                      : null,
+                                                ),
+                                              ],
                                             ),
                                           ),
+                                          const SizedBox(width: 8),
 
                                           // Thumbnail
                                           Container(
@@ -405,11 +426,11 @@ class _DestinationsListViewState extends ConsumerState<DestinationsListView> {
                                               border: Border.all(color: colors.border),
                                             ),
                                             clipBehavior: Clip.antiAlias,
-                                            child: dest.imageUrl.isNotEmpty
-                                                ? (dest.imageUrl.startsWith('http')
-                                                    ? Image.network(dest.imageUrl, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Icon(Icons.location_on, color: colors.textSecondary, size: 18))
-                                                    : Image.asset(dest.imageUrl, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Icon(Icons.location_on, color: colors.textSecondary, size: 18)))
-                                                : Icon(Icons.location_on, color: colors.textSecondary, size: 18),
+                                            child: SafeImage(
+                                              imageUrl: dest.imageUrl,
+                                              fit: BoxFit.cover,
+                                              placeholder: Icon(Icons.location_on, color: colors.textSecondary, size: 18),
+                                            ),
                                           ),
                                           const SizedBox(width: 20),
 
@@ -520,7 +541,7 @@ class _DestinationsListViewState extends ConsumerState<DestinationsListView> {
                                   ),
                                 ),
                               );
-                            },
+                            }),
                           ),
                         ],
                       ),

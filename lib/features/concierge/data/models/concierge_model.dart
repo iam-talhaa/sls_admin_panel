@@ -1,3 +1,4 @@
+import '../../../../core/constants/firebase_asset_urls.dart';
 import '../../../../core/models/localized_text.dart';
 
 /// Single screen-level hero banner for the Concierge screen.
@@ -19,7 +20,7 @@ class ConciergeBanner {
     return ConciergeBanner(
       title: LocalizedText.fromMap(map['title']),
       subtitle: LocalizedText.fromMap(map['subtitle']),
-      imageUrl: map['imageUrl']?.toString() ?? '',
+      imageUrl: FirebaseAssetUrls.getUrl(map['imageUrl']?.toString() ?? ''),
     );
   }
 
@@ -137,7 +138,7 @@ class ConciergeCategory {
       categoryTag: LocalizedText.fromMap(map['categoryTag']),
       title: LocalizedText.fromMap(map['title']),
       description: LocalizedText.fromMap(map['description']),
-      imageUrl: map['imageUrl']?.toString() ?? '',
+      imageUrl: FirebaseAssetUrls.getUrl(map['imageUrl']?.toString() ?? ''),
       isActive: map['isActive'] as bool? ?? true,
       features: parsedFeatures,
     );
